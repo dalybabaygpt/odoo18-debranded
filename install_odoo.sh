@@ -16,7 +16,13 @@ mkdir -p /opt/odoo/custom_addons
 chown -R odoo: /opt/odoo
 
 echo "📦 Cloning Odoo CE 18..."
-sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 --single-branch /opt/odoo/odoo
+if [ ! -d "/opt/odoo/odoo" ]; then
+  echo "📦 Cloning Odoo CE 18..."
+  sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 --single-branch /opt/odoo/odoo
+else
+  echo "✅ Odoo already cloned at /opt/odoo/odoo — skipping clone."
+fi
+
 
 echo "🐍 Creating Python virtual environment..."
 python3 -m venv /opt/odoo/venv
@@ -27,6 +33,7 @@ echo "🧠 Configuring PostgreSQL..."
 sudo -u postgres createuser -s odoo || true
 
 echo "📁 Moving your SmartERP files..."
+mkdir -p /etc/odoo
 cp -r ./etc/odoo.conf /etc/odoo/odoo.conf
 cp -r ./custom_addons/* /opt/odoo/custom_addons/
 chown -R odoo: /opt/odoo/custom_addons
