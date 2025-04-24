@@ -1,0 +1,10 @@
+<odoo>
+  <template id="pwa_manifest_injection" inherit_id="website.layout" priority="99">
+    <xpath expr="//head" position="inside">
+      <!-- Link to web manifest -->
+      <link rel="manifest" href="/tashil_website_pwa/static/src/manifest/manifest.json"/>
+      <!-- Theme color for address bar -->
+      <meta name="theme-color" content="#004080"/>
+    </xpath>
+  </template>
+</odoo>

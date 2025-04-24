@@ -1,0 +1,15 @@
+{
+  "name": "Tashil Portal",
+  "short_name": "Tashil",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#004080",
+  "icons": [
+    {
+      "src": "/web/image/res.company/1/logo",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

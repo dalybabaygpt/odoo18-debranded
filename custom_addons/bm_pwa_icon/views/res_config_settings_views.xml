@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- # -*- coding: utf-8 -*-
+# See LICENSE file for full licensing details.
+# See COPYRIGHT file for full copyright details.
+# Developed by Bizmate - Unbox Solutions Co., Ltd. -->
+
+<odoo>
+    <record id="bm_res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">bm.res.config.settings.view.form</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="0"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='pwa_settings']//setting" position="replace">
+                <setting help="This name will be used for the application when Odoo is installed through the browser.">
+                    <field name="pwa_app_name" placeholder="Odoo"/>
+                    <div class="w-50 row">
+                        <label for="web_app_icon_192_pwa" string="192x192" class="o_light_label mb-1"/>
+                        <field name='web_app_icon_192_pwa' widget="image" options="{'size': [100, 100]}"/>
+                        <div class="w-100 mt-1"/>
+                        <label for="web_app_icon_512_pwa" string="512x512" class="o_light_label mb-1"/>
+                        <field name='web_app_icon_512_pwa' widget="image" options="{'size': [100, 100]}"/>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

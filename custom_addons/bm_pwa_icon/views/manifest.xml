@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- # -*- coding: utf-8 -*-
+# See LICENSE file for full licensing details.
+# See COPYRIGHT file for full copyright details.
+# Developed by Bizmate - Unbox Solutions Co., Ltd. -->
+
+<odoo>
+    <template id="bm_webclient_bootstrap_inherit" inherit_id="web.webclient_bootstrap" name="webclient bootstrap inherit">
+        <xpath expr="//t[@t-set='head_web']" position="replace">
+            <t t-set="head_web">
+                <t t-set="company" t-value="request.env.company.sudo()"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+                <meta name="theme-color" t-att-content="color_code"/>
+                <link rel="manifest" t-att-href="'/bm_pwa_icon/%s/manifest' % (company.id) " crossorigin="use-credentials"/>
+                <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+                <meta name="apple-mobile-web-app-title" content="PWA"/>
+                
+                <link rel="apple-touch-icon" t-att-href="'/web/image/res.company/%s/web_app_icon_512_pwa/152x152' % (company.id)"/>
+                <meta name="mobile-web-app-capable" content="yes"/>
+                <script type="text/javascript">
+                    // Block to avoid leaking variables in the script scope
+                    {
+                        odoo.__session_info__ = <t t-out="json.dumps(session_info)"/>;
+                        const { user_context,  cache_hashes } = odoo.__session_info__;
+                        const lang = new URLSearchParams(document.location.search).get("lang");
+                        let menuURL = `/web/webclient/load_menus/${cache_hashes.load_menus}`;
+                        if (lang) {
+                            user_context.lang = lang;
+                            menuURL += `?lang=${lang}`
+                        }
+                        odoo.reloadMenus = () => fetch(menuURL).then(res => res.json());
+                        odoo.loadMenusPromise = odoo.reloadMenus();
+                        // Prefetch translations to speedup webclient. This is done in JS because link rel="prefetch"
+                        // is not yet supported on safari.
+                        fetch(`/web/webclient/translations/${cache_hashes.translations}?lang=${user_context.lang}`);
+                    }
+                </script>
+                <t t-if="request.httprequest.cookies.get('color_scheme') == 'dark'">
+                    <t t-call-assets="web.assets_web_dark"/>
+                </t>
+                <t t-else="">
+                    <t t-call-assets="web.assets_web"/>
+                </t>
+                <t t-call="web.conditional_assets_tests"/>
+            </t>
+        </xpath>
+    </template>
+
+</odoo>
