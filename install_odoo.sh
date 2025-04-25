@@ -1,46 +1,50 @@
 #!/bin/bash
 
-set -e
+echo "📦 Installing SmartERP..."
 
-echo "🔧 Updating and installing dependencies..."
-apt update && apt upgrade -y
-apt install -y git python3-pip build-essential wget python3-dev python3-venv \
-               python3-wheel libxslt-dev libzip-dev libldap2-dev libsasl2-dev \
-               python3-setuptools node-less libjpeg-dev libpq-dev libffi-dev \
-               libxml2-dev libssl-dev libjpeg-dev libblas-dev libatlas-base-dev \
-               postgresql nginx curl
+# Ensure required packages are installed
+apt update && apt install -y git python3-pip python3-venv libpq-dev libxml2-dev libxslt1-dev   libldap2-dev libsasl2-dev libjpeg-dev zlib1g-dev libevent-dev libffi-dev   libssl-dev libblas-dev libatlas-base-dev postgresql nginx curl
 
-echo "👤 Creating Odoo user..."
-adduser --system --home=/opt/odoo --group odoo || true
-mkdir -p /opt/odoo/custom_addons
+# Create Odoo user and folders
+useradd -m -d /opt/odoo -U -r -s /bin/bash odoo 2>/dev/null || echo "User already exists"
+mkdir -p /opt/odoo/{odoo,custom_addons,venv} /etc/odoo
 chown -R odoo: /opt/odoo
 
-echo "📦 Cloning Odoo CE 18..."
-if [ ! -d "/opt/odoo/odoo" ]; then
-  echo "📦 Cloning Odoo CE 18..."
+# Clone Odoo CE 18 if not exists
+if [ ! -d /opt/odoo/odoo/.git ]; then
   sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 --single-branch /opt/odoo/odoo
-else
-  echo "✅ Odoo already cloned at /opt/odoo/odoo — skipping clone."
 fi
 
-
-echo "🐍 Creating Python virtual environment..."
-python3 -m venv /opt/odoo/venv
+# Setup virtualenv
+if [ ! -d /opt/odoo/venv/bin ]; then
+  python3 -m venv /opt/odoo/venv
+fi
 source /opt/odoo/venv/bin/activate
-pip install -r /opt/odoo/odoo/requirements.txt
 
-echo "🧠 Configuring PostgreSQL..."
-sudo -u postgres createuser -s odoo || true
+# Upgrade pip and install requirements
+pip install --upgrade pip
+pip install -r /opt/odoo/odoo/requirements.txt || true
+pip install wheel
+pip install xlwt rjsmin pytz python-stdnum pyserial PyPDF2 polib passlib docopt asn1crypto XlsxWriter xlrd   urllib3 typing-extensions soupsieve six pyusb pycparser pyasn1 psutil platformdirs Pillow num2words   maxminddb MarkupSafe lxml isodate idna et-xmlfile docutils decorator chardet certifi cbor2 Babel attrs   requests reportlab python-dateutil pyasn1_modules openpyxl libsass Jinja2 cffi beautifulsoup4 vobject   requests-toolbelt requests-file python-ldap ofxparse geoip2 freezegun cryptography zeep pyopenssl
 
-echo "📁 Moving your SmartERP files..."
-mkdir -p /etc/odoo
-cp -r ./etc/odoo.conf /etc/odoo/odoo.conf
-cp -r ./custom_addons/* /opt/odoo/custom_addons/
-chown -R odoo: /opt/odoo/custom_addons
-mkdir -p /var/log/odoo && chown odoo: /var/log/odoo
+# Create default config if missing
+if [ ! -f /etc/odoo/odoo.conf ]; then
+  cat <<EOF > /etc/odoo/odoo.conf
+[options]
+admin_passwd = admin
+db_host = False
+db_port = False
+db_user = odoo
+db_password = False
+addons_path = /opt/odoo/odoo/addons,/opt/odoo/custom_addons
+proxy_mode = True
+logfile = /var/log/odoo.log
+EOF
+fi
 
-echo "🛠️ Creating Odoo systemd service..."
-cat <<EOF > /etc/systemd/system/odoo.service
+# Create systemd service if not exists
+if [ ! -f /etc/systemd/system/odoo.service ]; then
+  cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
 Description=Odoo SmartERP
 Requires=postgresql.service
@@ -58,12 +62,13 @@ StandardOutput=journal+console
 [Install]
 WantedBy=multi-user.target
 EOF
+  systemctl daemon-reexec
+  systemctl daemon-reload
+fi
 
-echo "🚀 Starting Odoo..."
-systemctl daemon-reexec
-systemctl daemon-reload
+# Start Odoo
 systemctl enable odoo
-systemctl start odoo
+systemctl restart odoo
 
 echo "✅ Odoo SmartERP installed successfully!"
 echo "Visit: http://<your-server-ip>:8069"
