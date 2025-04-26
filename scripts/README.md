@@ -5,7 +5,9 @@ This folder contains deployment scripts for setting up and configuring SmartERP 
 So now for a fresh Ubuntu server, you only have to:
 👉 Connect by SSH
 👉 Copy this one line:
+
 apt update && apt install -y git && git clone https://github.com/dalybabaygpt/odoo18-debranded.git && cd odoo18-debranded && bash scripts/full_auto_deploy.sh
+
 👉 Press Enter
 👉 DONE ✅
 
