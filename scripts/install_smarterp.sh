@@ -1,59 +1,65 @@
 #!/bin/bash
 
+set -e  # Exit immediately if any command fails
+
 echo "📦 Installing SmartERP..."
+START_TIME=$(date +%s)
 
-# Ensure required packages are installed
-apt update && apt install -y git python3-pip python3-venv libpq-dev libxml2-dev 
-libxslt1-dev \
-  libldap2-dev libsasl2-dev libjpeg-dev zlib1g-dev libevent-dev libffi-dev \
-  libssl-dev libblas-dev libatlas-base-dev postgresql postgresql-contrib nginx curl 
-software-properties-common
-
-# Install PostgreSQL if missing
-if ! command -v psql > /dev/null; then
-    echo "⚙️ Installing PostgreSQL..."
-    apt install -y postgresql postgresql-contrib
-    systemctl enable postgresql
-    systemctl start postgresql
+# Check Ubuntu Version
+VERSION_ID=$(grep VERSION_ID /etc/os-release | cut -d '"' -f 2)
+if [[ "$VERSION_ID" != "20.04" && "$VERSION_ID" != "22.04" && "$VERSION_ID" != "24.04" ]]; then
+  echo "❌ Unsupported Ubuntu version: $VERSION_ID"
+  echo "SmartERP installer only supports Ubuntu 20.04, 22.04, or 24.04."
+  exit 1
 fi
 
-# Ensure PostgreSQL is running
-systemctl restart postgresql
+echo "✅ Ubuntu version $VERSION_ID detected."
 
-# Create Odoo user and folders
+# Update server and install necessary packages
+echo "📦 Installing required system packages..."
+apt update
+apt install -y git python3-pip python3-venv build-essential wget curl libpq-dev libxml2-dev libxslt1-dev \
+libldap2-dev libsasl2-dev libjpeg-dev zlib1g-dev libevent-dev libffi-dev libssl-dev libblas-dev libatlas-base-dev \
+postgresql nginx curl software-properties-common
+
+# Ensure PostgreSQL is running
+systemctl enable postgresql
+systemctl start postgresql
+
+# Create Odoo user and necessary folders
+echo "⚙️ Setting up Odoo folders and user..."
 useradd -m -d /opt/odoo -U -r -s /bin/bash odoo 2>/dev/null || echo "User already exists"
 mkdir -p /opt/odoo/{odoo,custom_addons,venv} /etc/odoo
 chown -R odoo: /opt/odoo
 
-# Clone Odoo CE 18 if not exists
+# Clone Odoo 18 CE if not already
 if [ ! -d /opt/odoo/odoo/.git ]; then
-  sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 
---single-branch /opt/odoo/odoo
+  echo "📥 Cloning Odoo 18 CE..."
+  sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 --single-branch /opt/odoo/odoo
 fi
 
 # Setup virtualenv
 if [ ! -d /opt/odoo/venv/bin ]; then
+  echo "⚙️ Creating Python virtual environment..."
   python3 -m venv /opt/odoo/venv
 fi
+
 source /opt/odoo/venv/bin/activate
 
 # Upgrade pip and install requirements
+echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r /opt/odoo/odoo/requirements.txt || true
 pip install wheel
-pip install xlwt rjsmin pytz python-stdnum pyserial PyPDF2 polib passlib docopt asn1crypto 
-XlsxWriter xlrd \
-  urllib3 typing-extensions soupsieve six pyusb pycparser pyasn1 psutil platformdirs Pillow 
-num2words \
-  maxminddb MarkupSafe lxml isodate idna et-xmlfile docutils decorator chardet certifi 
-cbor2 Babel attrs \
-  requests reportlab python-dateutil pyasn1_modules openpyxl libsass Jinja2 cffi 
-beautifulsoup4 vobject \
-  requests-toolbelt requests-file python-ldap ofxparse geoip2 freezegun cryptography zeep 
-pyopenssl
+pip install -r /opt/odoo/odoo/requirements.txt || true
+pip install xlwt rjsmin pytz python-stdnum pyserial PyPDF2 polib passlib docopt asn1crypto XlsxWriter xlrd \
+urllib3 typing-extensions soupsieve six pyusb pycparser pyasn1 psutil platformdirs Pillow num2words \
+maxminddb MarkupSafe lxml isodate idna et-xmlfile docutils decorator chardet certifi cbor2 Babel attrs \
+requests reportlab python-dateutil pyasn1_modules openpyxl libsass Jinja2 cffi beautifulsoup4 vobject \
+requests-toolbelt requests-file python-ldap ofxparse geoip2 freezegun cryptography zeep pyopenssl
 
 # Create default config if missing
 if [ ! -f /etc/odoo/odoo.conf ]; then
+  echo "⚙️ Creating Odoo configuration file..."
   cat <<EOF > /etc/odoo/odoo.conf
 [options]
 admin_passwd = admin
@@ -72,6 +78,7 @@ fi
 
 # Create systemd service if not exists
 if [ ! -f /etc/systemd/system/smarterp.service ]; then
+  echo "⚙️ Creating smarterp systemd service..."
   cat <<EOF > /etc/systemd/system/smarterp.service
 [Unit]
 Description=SmartERP Odoo 18
@@ -94,24 +101,18 @@ EOF
   systemctl daemon-reload
 fi
 
-# Start SmartERP
+# Start SmartERP service
+echo "🚀 Starting SmartERP service..."
 systemctl enable smarterp
 systemctl restart smarterp
 
-# Ask for domain configuration
-read -p "🌐 Do you want to configure a domain with nginx and SSL now? (y/n): " 
-CONFIGURE_DOMAIN
-if [[ "$CONFIGURE_DOMAIN" == "y" ]]; then
-  echo "⚡ You can now run the separate nginx SSL script (create_odoo_nginx.sh) to setup 
-your domain cleanly."
-  echo "Example:"
-  echo "bash scripts/create_odoo_nginx.sh"
-else
-  echo "ℹ️ Skipped nginx + SSL for now. You can access Odoo via your server IP on port 
-8069."
-fi
+END_TIME=$(date +%s)
+INSTALLATION_TIME=$((END_TIME - START_TIME))
 
-echo "✅ SmartERP installation completed!"
-echo "Access your ERP: http://<your-server-ip>:8069 or https://your-domain.com (if SSL 
-configured)"
-
+echo "✅ SmartERP installation completed in $INSTALLATION_TIME seconds!"
+echo "========================================"
+echo "Access your ERP:"
+echo "👉 http://<your-server-ip>:8069"
+echo "👉 https://<your-domain> (if SSL configured)"
+echo "========================================"
+echo "Default Login: admin / admin (change after first login)"
