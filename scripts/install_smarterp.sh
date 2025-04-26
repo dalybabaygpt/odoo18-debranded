@@ -26,6 +26,15 @@ postgresql nginx curl software-properties-common
 systemctl enable postgresql
 systemctl start postgresql
 
+# Create PostgreSQL user for Odoo if not exists
+echo "⚙️ Creating PostgreSQL role 'odoo' if not exists..."
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
+  sudo -u postgres createuser --createdb odoo
+  echo "✅ PostgreSQL user 'odoo' created."
+else
+  echo "ℹ️ PostgreSQL user 'odoo' already exists. Continuing..."
+fi
+
 # Create Odoo user and necessary folders
 echo "⚙️ Setting up Odoo folders and user..."
 useradd -m -d /opt/odoo -U -r -s /bin/bash odoo 2>/dev/null || echo "User already exists"
@@ -48,8 +57,7 @@ source /opt/odoo/venv/bin/activate
 
 # Upgrade pip and install requirements
 echo "📦 Installing Python dependencies..."
-pip install --upgrade pip
-pip install wheel
+pip install --upgrade pip wheel
 pip install -r /opt/odoo/odoo/requirements.txt || true
 pip install xlwt rjsmin pytz python-stdnum pyserial PyPDF2 polib passlib docopt asn1crypto XlsxWriter xlrd \
 urllib3 typing-extensions soupsieve six pyusb pycparser pyasn1 psutil platformdirs Pillow num2words \
@@ -106,6 +114,17 @@ echo "🚀 Starting SmartERP service..."
 systemctl enable smarterp
 systemctl restart smarterp
 
+# Auto-create database 'smarterp' if not exists
+echo "⚙️ Creating default database 'smarterp' if not exists..."
+DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='smarterp'")
+if [ "$DB_EXISTS" != "1" ]; then
+  source /opt/odoo/venv/bin/activate
+  /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d smarterp -i base --without-demo=all --load-language=en_US --admin-password=admin
+  echo "✅ Database 'smarterp' created successfully!"
+else
+  echo "ℹ️ Database 'smarterp' already exists. Skipping creation."
+fi
+
 END_TIME=$(date +%s)
 INSTALLATION_TIME=$((END_TIME - START_TIME))
 
@@ -114,5 +133,6 @@ echo "========================================"
 echo "Access your ERP:"
 echo "👉 http://<your-server-ip>:8069"
 echo "👉 https://<your-domain> (if SSL configured)"
+echo "Username: admin"
+echo "Password: admin"
 echo "========================================"
-echo "Default Login: admin / admin (change after first login)"
