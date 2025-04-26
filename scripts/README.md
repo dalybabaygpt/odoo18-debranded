@@ -2,6 +2,12 @@
 
 This folder contains deployment scripts for setting up and configuring SmartERP (Odoo 18 CE).
 
+Step	Command from SSH terminal:
+1	apt update && apt install -y git
+2	git clone https://github.com/dalybabaygpt/odoo18-debranded.git
+3	cd odoo18-debranded
+4	bash scripts/full_auto_deploy.sh
+
 ## ⚙️ Deployment Scripts
 
 | Script | Description |
