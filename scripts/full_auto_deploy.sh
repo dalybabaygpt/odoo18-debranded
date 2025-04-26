@@ -1,25 +1,34 @@
 #!/bin/bash
-# 🚀 Full SmartERP + Nginx SSL deployer
+
+set -e  # Exit immediately if any command fails
 
 clear
 echo "==============================="
 echo " SmartERP Full Auto Deployment "
-echo "===============================\n"
+echo "==============================="
 
-# Install Odoo SmartERP
-echo "📦 Installing Odoo SmartERP..."
+# Step 1: Install Odoo + PostgreSQL
+echo "📦 Installing SmartERP system and dependencies..."
 bash scripts/install_smarterp.sh
 
-# Ask if user wants SSL + domain configuration
-read -p "🌐 Do you want to immediately configure Nginx + SSL? (y/n): " CONFIGURE_DOMAIN
+echo "✅ SmartERP system installation finished."
 
-if [[ "$CONFIGURE_DOMAIN" == "y" ]]; then
-  echo "⚡ Setting up Nginx + SSL..."
-  bash scripts/create_odoo_nginx.sh
+# Step 2: Ask user if he wants to configure Nginx + SSL now
+read -p "🌐 Do you want to configure Nginx + SSL now? (y/n): " CONFIGURE_DOMAIN
+
+if [[ "$CONFIGURE_DOMAIN" == "y" || "$CONFIGURE_DOMAIN" == "Y" ]]; then
+    echo "⚡ Starting Nginx + SSL full setup..."
+    bash scripts/create_odoo_nginx.sh
+    echo "✅ Nginx + SSL setup finished."
 else
-  echo "ℹ️ Skipped SSL setup. You can run bash scripts/create_odoo_nginx.sh later when 
-ready."
+    echo "ℹ️ Skipped Nginx + SSL setup. You can run bash scripts/create_odoo_nginx.sh manually later."
 fi
 
-echo "\n✅ SmartERP is fully deployed!"
-
+echo ""
+echo "========================================"
+echo "✅ SmartERP Full Deployment Completed!"
+echo "========================================"
+echo "👉 If SSL configured: https://yourdomain.com"
+echo "👉 If no domain yet: http://your-server-ip:8069"
+echo "Default Login: admin / admin"
+echo "========================================"
