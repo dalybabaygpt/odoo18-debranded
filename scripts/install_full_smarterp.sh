@@ -65,7 +65,7 @@ db_host = False
 db_port = False
 db_user = odoo
 db_password = odoo
-dbfilter = .*
+dbfilter = ^$DB_NAME\$
 logfile = /var/log/odoo/odoo.log
 EOF
 
@@ -98,7 +98,12 @@ systemctl start smarterp
 sleep 15
 
 # Create database
-/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --db-filter=^$DB_NAME\$ --without-demo=all --init base --admin-password $ADMIN_PASSWORD
+/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --without-demo=all --init base --admin-password $ADMIN_PASSWORD
+
+# Auto-create admin user
+PGPASSWORD=odoo psql -U odoo -d $DB_NAME -h localhost <<EOF
+UPDATE res_users SET login='admin', password='\$pbkdf2-sha512\$25000\$sH0WYoWZXX9SccC3B6tM0g\$HXvxMHmW3lZlNB9f0Eq0h1l3wDAECaUIMb0fWcsTrXPh9DR3P8WUGSYjoDRBiYBr51T5XTl61p59ltU6wUwhtA' WHERE id=1;
+EOF
 
 # Install all modules automatically
 /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --load-language=en_US --log-level=info -i $(ls /opt/odoo/custom-addons | tr '\n' ',' | sed 's/,$//') --stop-after-init
@@ -145,5 +150,5 @@ echo "🎉 SmartERP Installation DONE 🎉"
 echo "==============================="
 echo "URL: https://$DOMAIN"
 echo "Database: $DB_NAME"
-echo "Admin Password: $ADMIN_PASSWORD"
+echo "Admin Password: admin"
 echo "==============================="
