@@ -9,6 +9,8 @@ read -p "Enter domain name (example.com): " DOMAIN
 read -p "Enter admin password for database: " ADMIN_PASSWORD
 read -p "Enter database name (no spaces, only lowercase, example: smarterp): " DB_NAME
 read -p "Enter your VPS email (for SSL certificate alerts, example: you@example.com): " EMAIL
+read -p "Enter your GitHub username (for custom_addons clone): " GITHUB_USER
+read -p "Enter your GitHub token (for private repo access): " GITHUB_TOKEN
 
 # Summary
 clear
@@ -19,6 +21,7 @@ echo "Domain: $DOMAIN"
 echo "Database Name: $DB_NAME"
 echo "Admin Password: (hidden)"
 echo "SSL Email: $EMAIL"
+echo "GitHub User: $GITHUB_USER"
 echo "======================="
 
 sleep 2
@@ -35,7 +38,7 @@ mkdir -p /opt/odoo
 cd /opt/odoo
 
 # Clone Odoo CE 18
-git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0
+git clone https://github.com/odoo/odoo --depth 1 --branch 18.0
 
 # Create Python virtualenv
 python3 -m venv venv
@@ -44,6 +47,14 @@ source venv/bin/activate
 # Install Python requirements
 pip install wheel
 pip install -r odoo/requirements.txt
+
+# Setup custom-addons
+mkdir -p /opt/odoo/custom-addons
+
+# Clone your private repo and move custom_addons
+git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_USER/odoo18-debranded.git /opt/odoo/tmp
+mv /opt/odoo/tmp/custom_addons/* /opt/odoo/custom-addons/
+rm -rf /opt/odoo/tmp
 
 # Setup Odoo Configuration
 cat <<EOF > /etc/odoo.conf
@@ -57,9 +68,6 @@ db_password = odoo
 dbfilter = .*
 logfile = /var/log/odoo/odoo.log
 EOF
-
-# Create custom-addons folder
-mkdir -p /opt/odoo/custom-addons
 
 # Create Odoo systemd service
 cat <<EOF > /etc/systemd/system/smarterp.service
@@ -136,6 +144,6 @@ echo "==============================="
 echo "🎉 SmartERP Installation DONE 🎉"
 echo "==============================="
 echo "URL: https://$DOMAIN"
-echo "Admin Email: (you create it inside ERP)"
+echo "Database: $DB_NAME"
 echo "Admin Password: $ADMIN_PASSWORD"
 echo "==============================="
