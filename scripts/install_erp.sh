@@ -47,7 +47,7 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_
   sudo -u postgres createuser --createdb "$PROJECT_NAME"
   echo "✅ PostgreSQL user '$PROJECT_NAME' created."
 else
-  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists. Skipping."
+  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists."
 fi
 
 # Create database owned by user
@@ -55,7 +55,7 @@ if ! sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME"; the
   sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
   echo "✅ Database '$PROJECT_NAME' created."
 else
-  echo "ℹ️ Database '$PROJECT_NAME' exists. Skipping creation."
+  echo "ℹ️ Database '$PROJECT_NAME' exists."
 fi
 
 # ---- Setup ERP Directory & OS User ----
@@ -83,19 +83,27 @@ db_port = False
 db_user = $PROJECT_NAME
 db_password = False
 addons_path = /opt/erp/$PROJECT_NAME/server/addons,/opt/erp/$PROJECT_NAME/custom_addons
-logfile = /var/log/$PROJECT_NAME.log
+logfile = /var/log/$PROJECT_NAME/odoo.log
 proxy_mode = True
 gevent_port = 8072
 workers = 2
 EOF
 
-# Create logfile and set permissions
-touch /var/log/$PROJECT_NAME.log
-chown $PROJECT_NAME: /var/log/$PROJECT_NAME.log
+# Create log directory
+mkdir -p /var/log/$PROJECT_NAME
+chown $PROJECT_NAME: /var/log/$PROJECT_NAME
 
 # ---- Initialize Base Module ----
-echo "🚀 Initializing ERP database modules..."
-sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
+echo "🚀 Initializing ERP database...
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin server \
+  -c /etc/erp/$PROJECT_NAME.conf \
+  -d $PROJECT_NAME \
+  -i base \
+  --without-demo=all \
+  --load-language=en_US \
+  --stop-after-init"
+
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin server \
   -c /etc/erp/$PROJECT_NAME.conf \
   -d $PROJECT_NAME \
   -i base \
@@ -103,7 +111,8 @@ sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_
   --load-language=en_US \
   --stop-after-init
 
-# ---- Systemd Service Setup ----ncat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
+# ---- Create systemd Service ----
+cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
 [Unit]
 Description=$PROJECT_NAME ERP Server
 Requires=postgresql.service
@@ -113,9 +122,10 @@ After=network.target postgresql.service
 Type=simple
 User=$PROJECT_NAME
 Group=$PROJECT_NAME
-ExecStart=/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin -c /etc/erp/$PROJECT_NAME.conf
+ExecStart=/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin server -c /etc/erp/$PROJECT_NAME.conf
 SyslogIdentifier=$PROJECT_NAME
 StandardOutput=journal+console
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
@@ -154,5 +164,69 @@ server {
   ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
   include /etc/letsencrypt/options-ssl-nginx.conf;
   ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+  location / {
+    proxy_pass http://127.0.0.1:8069;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+  location /longpolling {
+    proxy_pass http://127.0.0.1:8072;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+}
 EOF
-}]}
+  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl reload nginx
+
+  if ping -c1 "$DOMAIN" &>/dev/null; then
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email || 
+      echo "⚠️ SSL issuance failed; continuing without SSL."
+  else
+    echo "⚠️ DNS not ready; skipping SSL issuance."
+  fi
+else
+  echo "🌐 Configuring default Nginx to proxy ERP..."
+  cat > /etc/nginx/sites-available/default <<EOF
+server {
+  listen 80 default_server;
+  server_name _;
+  map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }
+
+  location / {
+    proxy_pass http://127.0.0.1:8069;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+  location /longpolling {
+    proxy_pass http://127.0.0.1:8072;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+}
+EOF
+  nginx -t && systemctl reload nginx
+fi
+
+# ---- Finish ----
+clear
+echo "========================================="
+echo "🎉 $PROJECT_NAME installation complete! 🎉"
+echo "========================================="
+echo "Access URLs:"
+echo "  HTTP:  http://<SERVER_IP>:8069"
+[[ -n "$DOMAIN" ]] && echo "  HTTPS: https://$DOMAIN"
+echo "Default credentials: admin / $ADMIN_PASSWORD"
+echo "========================================="
