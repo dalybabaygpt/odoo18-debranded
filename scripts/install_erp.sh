@@ -73,7 +73,7 @@ sudo -u $PROJECT_NAME python3 -m venv /opt/erp/$PROJECT_NAME/venv
 sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/pip install --upgrade pip wheel
 sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/pip install -r /opt/erp/$PROJECT_NAME/server/requirements.txt || true
 
-# ---- ERP Configuration ----
+# ---- ERP Configuration & Logfile ----
 mkdir -p /etc/erp
 cat > /etc/erp/$PROJECT_NAME.conf <<EOF
 [options]
@@ -88,6 +88,20 @@ proxy_mode = True
 gevent_port = 8072
 workers = 2
 EOF
+
+# Create logfile and set permissions
+touch /var/log/$PROJECT_NAME.log
+chown $PROJECT_NAME: /var/log/$PROJECT_NAME.log
+
+# ---- Initialize Base Module as ERP OS User ----
+echo "🚀 Initializing ERP database modules..."
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
+  -c /etc/erp/$PROJECT_NAME.conf \
+  -d $PROJECT_NAME \
+  -i base \
+  --without-demo=all \
+  --load-language=en_US \
+  --stop-after-init
 
 # ---- Systemd Service ----
 cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
@@ -111,16 +125,6 @@ EOF
 systemctl daemon-reload
 systemctl enable $PROJECT_NAME
 systemctl restart $PROJECT_NAME
-
-# ---- Initialize Base Module as ERP OS User ----
-echo "🚀 Initializing ERP database modules..."
-sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
-  -c /etc/erp/$PROJECT_NAME.conf \
-  -d $PROJECT_NAME \
-  -i base \
-  --without-demo=all \
-  --load-language=en_US \
-  --stop-after-init
 
 # ---- Nginx & SSL ----
 if [[ -n "$DOMAIN" ]]; then
