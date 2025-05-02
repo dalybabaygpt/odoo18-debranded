@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Final Generic ERP Installer (authbind version)
+# Final Generic ERP Installer with Safe DB Init
 # Ubuntu 22.04 / 24.04 compatible with IP access via port 80
 
 set -e
@@ -8,7 +8,7 @@ clear
 # === Banner ===
 echo "========================================="
 echo "   Generic ERP Full Auto-Installer       "
-echo "        (authbind | port 80 direct)       "
+echo "        (authbind | port 80 safe init)   "
 echo "========================================="
 
 # === Inputs ===
@@ -66,24 +66,27 @@ addons_path = $ERP_ROOT/server/addons,$ERP_ROOT/custom_addons
 logfile = /var/log/$PROJECT_NAME/odoo.log
 proxy_mode = True
 workers = 2
-http_port = 80
+http_port = 8769
 EOF
 
 mkdir -p "/var/log/$PROJECT_NAME"
 touch "/var/log/$PROJECT_NAME/odoo.log"
 chown -R "$PROJECT_NAME":"$PROJECT_NAME" "/var/log/$PROJECT_NAME"
 
-# === Allow Port 80 with authbind ===
-echo "🔓 Binding Odoo to port 80 using authbind..."
+# === Authbind for port 80 ===
+echo "🔓 Preparing authbind for port 80..."
 touch /etc/authbind/byport/80
 chmod 500 /etc/authbind/byport/80
 chown $PROJECT_NAME /etc/authbind/byport/80
 
-# === DB Init ===
-echo "🚀 Initializing ERP database..."
-sudo -u "$PROJECT_NAME" authbind "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
+# === Run Init On Port 8769 ===
+echo "🚀 Initializing ERP database safely (port 8769)..."
+sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
   -c "/etc/erp/$PROJECT_NAME.conf" -d "$PROJECT_NAME" -i base \
   --without-demo=all --load-language=en_US --stop-after-init
+
+# === Update config for port 80 ===
+sed -i 's/http_port = 8769/http_port = 80/' "/etc/erp/$PROJECT_NAME.conf"
 
 # === systemd service ===
 echo "🔁 Creating systemd service..."
