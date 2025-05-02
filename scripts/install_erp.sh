@@ -1,74 +1,82 @@
 #!/bin/bash
 
-set -e  # Exit if any error
-
+set -e
 clear
 
 echo "========================================="
-echo "      Generic ERP Full Auto-Installer    "
+echo "   Generic ERP Full Auto-Installer       "
 echo "========================================="
 
-# Ask user inputs
-read -p "Enter your ERP Project Name (example: myerp): " PROJECT_NAME
-read -p "Enter domain name (leave empty if no domain yet): " DOMAIN
+# ---- User Inputs ----
+read -p "Enter ERP project name (example: myerp): " PROJECT_NAME
+read -p "Enter domain name (leave empty if no domain): " DOMAIN
 read -s -p "Enter admin password for database: " ADMIN_PASSWORD
+echo
 
-# Ubuntu version detection
-UBUNTU_VERSION=$(lsb_release -rs)
-
-if [[ "$UBUNTU_VERSION" != "22.04" && "$UBUNTU_VERSION" != "24.04" ]]; then
-    echo "❌ Unsupported Ubuntu version: $UBUNTU_VERSION. Only 22.04 and 24.04 supported."
-    exit 1
+# ---- Check Ubuntu Version ----
+UBX=$(lsb_release -rs)
+if [[ "$UBX" != "22.04" && "$UBX" != "24.04" ]]; then
+  echo "❌ Unsupported Ubuntu version: $UBX. Only 22.04 and 24.04 supported."
+  exit 1
 fi
 
-echo "\n✅ Ubuntu $UBUNTU_VERSION detected. Proceeding..."
+echo "✅ Ubuntu $UBX detected."
 
-# Install core packages
-apt update && apt install -y git wget curl python3-pip python3-venv python3-wheel python3-dev build-essential \
-    libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev libjpeg-dev zlib1g-dev libevent-dev \
-    libatlas-base-dev postgresql nginx software-properties-common
+# ---- Install Dependencies ----
+apt update
+apt install -y git wget curl python3-venv python3-pip python3-wheel python3-dev build-essential \
+  libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev libjpeg-dev zlib1g-dev \
+  libevent-dev libatlas-base-dev postgresql nginx software-properties-common
 
-# Certbot setup
-if ! command -v certbot &> /dev/null
-then
-    if [[ "$UBUNTU_VERSION" == "24.04" ]]; then
-        snap install core; snap refresh core; snap install --classic certbot
-        ln -s /snap/bin/certbot /usr/bin/certbot
-    else
-        apt install -y certbot python3-certbot-nginx
-    fi
+# ---- Install Certbot ----
+if ! command -v certbot &>/dev/null; then
+  if [[ "$UBX" == "24.04" ]]; then
+    snap install core; snap refresh core; snap install --classic certbot
+    ln -s /snap/bin/certbot /usr/bin/certbot
+  else
+    apt install -y certbot python3-certbot-nginx
+  fi
 fi
 
-# Setup PostgreSQL
+# ---- PostgreSQL Setup ----
 systemctl enable postgresql
 systemctl start postgresql
 
+# Create DB user
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_NAME'" | grep -q 1; then
   sudo -u postgres createuser --createdb "$PROJECT_NAME"
   echo "✅ PostgreSQL user '$PROJECT_NAME' created."
 else
-  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' already exists."
+  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists."
 fi
 
-# Create project structure
+# Create database
+if ! sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME"; then
+  sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
+  echo "✅ Database '$PROJECT_NAME' created."
+else
+  echo "ℹ️ Database '$PROJECT_NAME' exists. Skipping creation."
+fi
+
+# ---- Setup ERP Directory & User ----
 mkdir -p /opt/erp/$PROJECT_NAME/{server,custom_addons,venv}
-useradd -m -d /opt/erp/$PROJECT_NAME -U -r -s /bin/bash $PROJECT_NAME 2>/dev/null || echo "User already exists"
+useradd -m -d /opt/erp/$PROJECT_NAME -U -r -s /bin/bash $PROJECT_NAME 2>/dev/null || true
 chown -R $PROJECT_NAME: /opt/erp/$PROJECT_NAME
 
-# Clone Odoo 18 (clean)
+# ---- Clone ERP Server Code ----
 if [ ! -d /opt/erp/$PROJECT_NAME/server/.git ]; then
-    sudo -u $PROJECT_NAME git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 /opt/erp/$PROJECT_NAME/server
+  sudo -u $PROJECT_NAME git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 /opt/erp/$PROJECT_NAME/server
 fi
 
-# Setup virtualenv
+# ---- Python Virtualenv & Dependencies ----
 sudo -u $PROJECT_NAME python3 -m venv /opt/erp/$PROJECT_NAME/venv
 source /opt/erp/$PROJECT_NAME/venv/bin/activate
 pip install --upgrade pip wheel
 pip install -r /opt/erp/$PROJECT_NAME/server/requirements.txt || true
 
-# Create configuration
+# ---- ERP Configuration ----
 mkdir -p /etc/erp
-cat <<EOF > /etc/erp/$PROJECT_NAME.conf
+cat > /etc/erp/$PROJECT_NAME.conf <<EOF
 [options]
 admin_passwd = $ADMIN_PASSWORD
 db_host = False
@@ -82,8 +90,8 @@ gevent_port = 8072
 workers = 2
 EOF
 
-# Create systemd service
-cat <<EOF > /etc/systemd/system/$PROJECT_NAME.service
+# ---- Systemd Service ----
+cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
 [Unit]
 Description=$PROJECT_NAME ERP Server
 Requires=postgresql.service
@@ -91,11 +99,10 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-SyslogIdentifier=$PROJECT_NAME
-PermissionsStartOnly=true
 User=$PROJECT_NAME
 Group=$PROJECT_NAME
 ExecStart=/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin -c /etc/erp/$PROJECT_NAME.conf
+SyslogIdentifier=$PROJECT_NAME
 StandardOutput=journal+console
 
 [Install]
@@ -106,62 +113,82 @@ systemctl daemon-reload
 systemctl enable $PROJECT_NAME
 systemctl restart $PROJECT_NAME
 
-# Wait ERP startup
-sleep 10
+# ---- Initialize Base Module ----
+echo "🚀 Initializing ERP database modules..."
+source /opt/erp/$PROJECT_NAME/venv/bin/activate
+/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
+  -c /etc/erp/$PROJECT_NAME.conf \
+  -d $PROJECT_NAME \
+  -i base \
+  --without-demo=all \
+  --load-language=en_US \
+  --stop-after-init
 
-# Create default database
-/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin -d $PROJECT_NAME -i base --without-demo=all --load-language=en_US --admin-password=$ADMIN_PASSWORD --stop-after-init
+# ---- Nginx & SSL ----
+if [[ -n "$DOMAIN" ]]; then
+  echo "🌐 Configuring Nginx for $DOMAIN..."
+  cat > /etc/nginx/sites-available/$PROJECT_NAME <<EOF
+map \$http_upgrade \$connection_upgrade {
+  default upgrade;
+  ''      close;
+}
 
-# Setup Nginx
-if [ -n "$DOMAIN" ]; then
-    echo "⚡ Setting up Nginx for domain $DOMAIN"
-    cat <<EOF > /etc/nginx/sites-available/$PROJECT_NAME
 server {
-    listen 80;
-    server_name $DOMAIN;
+  listen 80;
+  server_name $DOMAIN;
+  return 301 https://\$host\$request_uri;
+}
 
-    proxy_read_timeout 720s;
-    proxy_connect_timeout 720s;
-    proxy_send_timeout 720s;
+server {
+  listen 443 ssl http2;
+  server_name $DOMAIN;
 
-    proxy_set_header X-Forwarded-Host \$host;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
+  client_max_body_size 100M;
+  proxy_read_timeout 86400s;
+  proxy_connect_timeout 86400s;
+  proxy_send_timeout 86400s;
+  proxy_buffering off;
+
+  ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+  include /etc/letsencrypt/options-ssl-nginx.conf;
+  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+  location / {
+    proxy_pass http://127.0.0.1:8069;
+    proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
-
-    access_log /var/log/nginx/$PROJECT_NAME.access.log;
-    error_log /var/log/nginx/$PROJECT_NAME.error.log;
-
-    location / {
-        proxy_pass http://127.0.0.1:8069;
-        proxy_redirect off;
-    }
-    location /longpolling/ {
-        proxy_pass http://127.0.0.1:8072;
-    }
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+  location /longpolling {
+    proxy_pass http://127.0.0.1:8072;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
 }
 EOF
+  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl reload nginx
 
-    ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
-    rm -f /etc/nginx/sites-enabled/default || true
-    systemctl reload nginx
-
-    # Validate domain reachable
-    if ping -c 1 $DOMAIN &> /dev/null; then
-        certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email || echo "⚠️ SSL generation failed. Continuing without SSL."
-    else
-        echo "⚠️ Domain DNS not ready. Skipping SSL."
-    fi
-
-else
-    echo "ℹ️ No domain entered. Skipping Nginx setup."
+  if ping -c1 "$DOMAIN" &>/dev/null; then
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email || echo "⚠️ SSL issuance failed; continuing without SSL."
+  else
+    echo "⚠️ DNS not ready; skipping SSL issuance."
+  fi
 fi
 
+# ---- Finish ----
 clear
-
 echo "========================================="
-echo "🎉 Installation completed successfully!"
+echo "🎉 $PROJECT_NAME installation complete! 🎉"
 echo "========================================="
-echo "- Access: http://your-server-ip:8069 or https://$DOMAIN if SSL configured"
-echo "- Default login: admin / (your password)"
+echo "Access URLs:"
+echo "  HTTP:  http://<SERVER_IP>:8069"
+[[ -n "$DOMAIN" ]] && echo "  HTTPS: https://$DOMAIN"
+echo "Default credentials: admin / $ADMIN_PASSWORD"
 echo "========================================="
