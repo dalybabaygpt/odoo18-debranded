@@ -47,7 +47,7 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_
   sudo -u postgres createuser --createdb "$PROJECT_NAME"
   echo "✅ PostgreSQL user '$PROJECT_NAME' created."
 else
-  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists."
+  echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists. Skipping."
 fi
 
 # Create database owned by user
@@ -93,7 +93,7 @@ EOF
 touch /var/log/$PROJECT_NAME.log
 chown $PROJECT_NAME: /var/log/$PROJECT_NAME.log
 
-# ---- Initialize Base Module as ERP OS User ----
+# ---- Initialize Base Module (no ports) ----
 echo "🚀 Initializing ERP database modules..."
 sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
   -c /etc/erp/$PROJECT_NAME.conf \
@@ -101,9 +101,11 @@ sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_
   -i base \
   --without-demo=all \
   --load-language=en_US \
-  --stop-after-init
+  --stop-after-init \
+  --http-port=0 \
+  --longpolling-port=0
 
-# ---- Systemd Service ----
+# ---- Systemd Service Setup ----
 cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
 [Unit]
 Description=$PROJECT_NAME ERP Server
@@ -126,7 +128,7 @@ systemctl daemon-reload
 systemctl enable $PROJECT_NAME
 systemctl restart $PROJECT_NAME
 
-# ---- Nginx & SSL ----
+# ---- Nginx Configuration ----
 if [[ -n "$DOMAIN" ]]; then
   echo "🌐 Configuring Nginx for $DOMAIN..."
   cat > /etc/nginx/sites-available/$PROJECT_NAME <<EOF
@@ -174,14 +176,42 @@ server {
 }
 EOF
   ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
-  rm -f /etc/nginx/sites-enabled/default
+  # remove default only if exists
+  rm -f /etc/nginx/sites-enabled/default || true
   nginx -t && systemctl reload nginx
 
+  # SSL issuance
   if ping -c1 "$DOMAIN" &>/dev/null; then
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email || echo "⚠️ SSL issuance failed; continuing without SSL."
   else
     echo "⚠️ DNS not ready; skipping SSL issuance."
   fi
+else
+  echo "🌐 Configuring default Nginx site to proxy ERP on port 80..."
+  # default catch-all
+  cat > /etc/nginx/sites-available/default <<EOF
+server {
+  listen 80 default_server;
+  server_name _;
+  map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }
+  location / {
+    proxy_pass http://127.0.0.1:8069;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+  location /longpolling {
+    proxy_pass http://127.0.0.1:8072;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+  }
+}
+EOF
+  nginx -t && systemctl reload nginx
 fi
 
 # ---- Finish ----
