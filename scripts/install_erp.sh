@@ -30,8 +30,11 @@ DEPS=(git wget curl python3-venv python3-pip python3-wheel python3-dev build-ess
       libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql nginx)
 for pkg in "${DEPS[@]}"; do apt install -y "$pkg"; done
 
+echo "✅ System dependencies installed."
+
 # -- Install Certbot --
 if ! command -v certbot &>/dev/null; then
+  echo "🔐 Installing Certbot..."
   if [[ "$UBX" == "24.04" ]]; then
     snap install core && snap refresh core && snap install --classic certbot
     ln -sf /snap/bin/certbot /usr/bin/certbot
@@ -42,13 +45,23 @@ fi
 
 # -- PostgreSQL Setup --
 systemctl enable postgresql && systemctl start postgresql
-# Create role if missing
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_NAME'" | grep -q 1 || \
+echo "✅ PostgreSQL started."
+
+# Create role and database
+if ! sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_NAME'" | grep -q 1; then
   sudo -u postgres createuser --createdb "$PROJECT_NAME"
-# Create database if missing
-sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME" || \
+  echo "✅ PostgreSQL role '$PROJECT_NAME' created."
+else
+  echo "ℹ️ PostgreSQL role '$PROJECT_NAME' exists."
+fi
+if ! sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME"; then
   sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
-echo "✅ PostgreSQL user & database '$PROJECT_NAME' ready."
+  echo "✅ Database '$PROJECT_NAME' created."
+else
+  echo "ℹ️ Database '$PROJECT_NAME' exists."
+fi
+
+echo "✅ PostgreSQL role & database ready."
 
 # -- Setup ERP Structure --
 ERP_ROOT=/opt/erp/$PROJECT_NAME
@@ -56,19 +69,26 @@ mkdir -p "$ERP_ROOT"/server "$ERP_ROOT"/custom_addons "$ERP_ROOT"/venv
 useradd -m -d "$ERP_ROOT" -s /bin/bash "$PROJECT_NAME" 2>/dev/null || true
 chown -R "$PROJECT_NAME":"$PROJECT_NAME" "$ERP_ROOT"
 
+echo "✅ ERP directory structure created at $ERP_ROOT."
+
 # -- Clone Odoo 18 CE --
 if [[ ! -d "$ERP_ROOT/server/.git" ]]; then
+  echo "📥 Cloning Odoo 18 CE..."
   sudo -u "$PROJECT_NAME" git clone --depth 1 --branch 18.0 https://github.com/odoo/odoo.git "$ERP_ROOT/server"
 fi
 
+echo "✅ Odoo source ready."
+
 # -- Python Virtualenv & Dependencies --
+echo "🐍 Setting up Python virtualenv..."
 sudo -u "$PROJECT_NAME" python3 -m venv "$ERP_ROOT/venv"
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install --upgrade pip wheel
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install -r "$ERP_ROOT/server/requirements.txt" || true
 
-echo "✅ Python virtualenv and dependencies installed."
+echo "✅ Python virtualenv and requirements installed."
 
 # -- ERP Configuration --
+echo "⚙️ Creating config file..."
 mkdir -p /etc/erp
 cat > /etc/erp/$PROJECT_NAME.conf <<EOF
 [options]
@@ -84,23 +104,27 @@ workers = 2
 EOF
 
 # -- Log Directory --
+echo "🗄️ Setting up log directory..."
 mkdir -p /var/log/$PROJECT_NAME
 touch /var/log/$PROJECT_NAME/odoo.log
 chown -R "$PROJECT_NAME":"$PROJECT_NAME" /var/log/$PROJECT_NAME
 
+echo "✅ Log directory setup."
+
 # -- Initialize Database --
 echo "🚀 Initializing database and base module..."
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
-    -c /etc/erp/$PROJECT_NAME.conf \
-    -d "$PROJECT_NAME" \
-    -i base \
-    --without-demo=all \
-    --load-language=en_US \
-    --stop-after-init
+  -c /etc/erp/$PROJECT_NAME.conf \
+  -d "$PROJECT_NAME" \
+  -i base \
+  --without-demo=all \
+  --load-language=en_US \
+  --stop-after-init
 
 echo "✅ Database initialized."
 
 # -- Create systemd Service --
+echo "🛠️ Creating systemd service..."
 cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
 [Unit]
 Description=$PROJECT_NAME ERP Service
@@ -117,14 +141,17 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-enable_cmd=$(systemctl enable $PROJECT_NAME 2>&1)
-start_cmd=$(systemctl start $PROJECT_NAME 2>&1)
+systemctl daemon-reload && systemctl enable $PROJECT_NAME && systemctl start $PROJECT_NAME
+
 echo "✅ systemd service '$PROJECT_NAME' started."
 
 # -- Nginx Configuration --
+echo "🌐 Configuring Nginx..."
+# Remove all existing sites
+rm -f /etc/nginx/sites-enabled/*
+
 if [[ -n "$DOMAIN" ]]; then
-  echo "🌐 Configuring Nginx for domain '$DOMAIN'..."
+  echo "🔗 Domain mode for $DOMAIN..."
   cat > /etc/nginx/sites-available/$PROJECT_NAME <<EOF
 server {
     listen 80;
@@ -164,7 +191,6 @@ server {
 }
 EOF
   ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
-  rm -f /etc/nginx/sites-enabled/default
   nginx -t && systemctl reload nginx
   if ping -c1 "$DOMAIN" &>/dev/null; then
     certbot --nginx -d "$DOMAIN" --agree-tos --non-interactive --register-unsafely-without-email || echo "⚠️ SSL issuance failed."
@@ -172,7 +198,7 @@ EOF
     echo "⚠️ DNS not ready; skipping SSL issuance."
   fi
 else
-  echo "🌐 No domain provided. Configuring default Nginx proxy..."
+  echo "🔗 IP-only mode..."
   cat > /etc/nginx/sites-available/default <<EOF
 server {
     listen 80 default_server;
@@ -194,12 +220,11 @@ server {
     }
 }
 EOF
+  ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
   nginx -t && systemctl reload nginx
 fi
 
-# -- Done --
-clear
-echo "========================================="
+echo "\n========================================="
 echo " 🎉 Installation Complete for $PROJECT_NAME 🎉"
 echo "========================================="
 echo " Access your ERP:"
