@@ -83,7 +83,7 @@ chown $PROJECT_NAME /etc/authbind/byport/80
 echo "🚀 Initializing ERP database safely (port 8769)..."
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
   -c "/etc/erp/$PROJECT_NAME.conf" -d "$PROJECT_NAME" -i base \
-  --without-demo=all --load-language=en_US --stop-after-init
+  --without-demo=all --load-language=en_US --stop-after-init || { echo "❌ ERP init failed"; exit 1; }
 
 # === Update config for port 80 ===
 sed -i 's/http_port = 8769/http_port = 80/' "/etc/erp/$PROJECT_NAME.conf"
@@ -110,6 +110,16 @@ EOF
 systemctl daemon-reload
 systemctl enable "$PROJECT_NAME"
 systemctl restart "$PROJECT_NAME"
+
+sleep 3
+
+# === Final Curl Check ===
+echo "🌐 Verifying HTTP access on port 80..."
+if curl -s --head http://127.0.0.1 | grep -i '200 OK' > /dev/null; then
+  echo "✅ ERP is accessible on port 80."
+else
+  echo "❌ ERP failed to respond on port 80. Check systemd logs with: journalctl -u $PROJECT_NAME --no-pager"
+fi
 
 # === Final Info ===
 echo -e "\n========================================="
