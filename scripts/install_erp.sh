@@ -109,10 +109,10 @@ EOF
 
 systemctl daemon-reload
 systemctl enable "$PROJECT_NAME"
-systemctl start "$PROJECT_NAME"
+systemctl restart "$PROJECT_NAME"
 
 # === Final Info ===
-echo "\n========================================="
+echo -e "\n========================================="
 echo " 🎉 ERP $PROJECT_NAME installed and running 🎉"
 echo "========================================="
 echo " Access it via: http://$(hostname -I | awk '{print $1}')"
