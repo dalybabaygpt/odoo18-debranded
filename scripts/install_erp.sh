@@ -31,8 +31,8 @@ apt install -y git wget curl python3-venv python3-pip python3-wheel python3-dev 
 # ---- Install Certbot ----
 if ! command -v certbot &>/dev/null; then
   if [[ "$UBX" == "24.04" ]]; then
-    snap install core; snap refresh core; snap install --classic certbot
-    ln -s /snap/bin/certbot /usr/bin/certbot
+    snap install core && snap refresh core && snap install --classic certbot
+    ln -sf /snap/bin/certbot /usr/bin/certbot
   else
     apt install -y certbot python3-certbot-nginx
   fi
@@ -50,7 +50,7 @@ else
   echo "ℹ️ PostgreSQL user '$PROJECT_NAME' exists."
 fi
 
-# Create database
+# Create database owned by user
 if ! sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME"; then
   sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
   echo "✅ Database '$PROJECT_NAME' created."
@@ -58,7 +58,7 @@ else
   echo "ℹ️ Database '$PROJECT_NAME' exists. Skipping creation."
 fi
 
-# ---- Setup ERP Directory & User ----
+# ---- Setup ERP Directory & OS User ----
 mkdir -p /opt/erp/$PROJECT_NAME/{server,custom_addons,venv}
 useradd -m -d /opt/erp/$PROJECT_NAME -U -r -s /bin/bash $PROJECT_NAME 2>/dev/null || true
 chown -R $PROJECT_NAME: /opt/erp/$PROJECT_NAME
@@ -70,9 +70,8 @@ fi
 
 # ---- Python Virtualenv & Dependencies ----
 sudo -u $PROJECT_NAME python3 -m venv /opt/erp/$PROJECT_NAME/venv
-source /opt/erp/$PROJECT_NAME/venv/bin/activate
-pip install --upgrade pip wheel
-pip install -r /opt/erp/$PROJECT_NAME/server/requirements.txt || true
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/pip install --upgrade pip wheel
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/pip install -r /opt/erp/$PROJECT_NAME/server/requirements.txt || true
 
 # ---- ERP Configuration ----
 mkdir -p /etc/erp
@@ -113,10 +112,9 @@ systemctl daemon-reload
 systemctl enable $PROJECT_NAME
 systemctl restart $PROJECT_NAME
 
-# ---- Initialize Base Module ----
+# ---- Initialize Base Module as ERP OS User ----
 echo "🚀 Initializing ERP database modules..."
-source /opt/erp/$PROJECT_NAME/venv/bin/activate
-/opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
+sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
   -c /etc/erp/$PROJECT_NAME.conf \
   -d $PROJECT_NAME \
   -i base \
