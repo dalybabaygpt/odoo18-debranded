@@ -1,62 +1,51 @@
 #!/bin/bash
 
-# ===================================================
-#  SmartERP Full Automatic Install with Domain + SSL
-# ===================================================
+# ==============================
+#  Odoo CE 18 + Custom Addons
+#  IP-Only Installation Script
+# ==============================
 
-# Ask all parameters at the beginning
-read -p "Enter domain name (example.com): " DOMAIN
-read -p "Enter admin password for database: " ADMIN_PASSWORD
-read -p "Enter database name (no spaces, only lowercase, example: smarterp): " DB_NAME
-read -p "Enter your VPS email (for SSL certificate alerts, example: you@example.com): " EMAIL
-read -p "Enter your GitHub username (for custom_addons clone): " GITHUB_USER
-read -p "Enter your GitHub token (for private repo access): " GITHUB_TOKEN
+# Ask for DB name
+read -p "Enter database name (lowercase, no spaces): " DB_NAME
 
-# Summary
-clear
-echo "======================="
-echo "SmartERP Install Summary"
-echo "======================="
-echo "Domain: $DOMAIN"
-echo "Database Name: $DB_NAME"
-echo "Admin Password: (hidden)"
-echo "SSL Email: $EMAIL"
-echo "GitHub User: $GITHUB_USER"
-echo "======================="
+# Constants
+ADMIN_PASSWORD="admin"
+GITHUB_USER="dalybabaygpt"
+GITHUB_TOKEN="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"
 
-sleep 2
-
-# Update server and install requirements
+# Update and install dependencies
 apt update && apt upgrade -y
-apt install -y git wget curl software-properties-common build-essential python3-dev python3-pip python3-venv python3-wheel python3-setuptools libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql nginx certbot python3-certbot-nginx
+apt install -y git wget curl software-properties-common build-essential \
+    python3-dev python3-pip python3-venv python3-wheel python3-setuptools \
+    libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev \
+    libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql \
+    python3-psycopg2
 
-# Install PostgreSQL and create user
+# Setup PostgreSQL
 su - postgres -c "psql -c \"CREATE USER odoo WITH PASSWORD 'odoo';\""
 
-# Setup folders
+# Create directories
 mkdir -p /opt/odoo
 cd /opt/odoo
 
 # Clone Odoo CE 18
-git clone https://github.com/odoo/odoo --depth 1 --branch 18.0
+git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0
 
-# Create Python virtualenv
-python3 -m venv venv
-source venv/bin/activate
+# Create virtualenv
+python3 -m venv /opt/odoo/venv
+source /opt/odoo/venv/bin/activate
 
-# Install Python requirements
+# Install Python packages
 pip install wheel
 pip install -r odoo/requirements.txt
 
-# Setup custom-addons
+# Custom addons
 mkdir -p /opt/odoo/custom-addons
-
-# Clone your private repo and move custom_addons
-git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_USER/odoo18-debranded.git /opt/odoo/tmp
+git clone https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/odoo18-debranded.git /opt/odoo/tmp
 mv /opt/odoo/tmp/custom_addons/* /opt/odoo/custom-addons/
 rm -rf /opt/odoo/tmp
 
-# Setup Odoo Configuration
+# Create config file
 cat <<EOF > /etc/odoo.conf
 [options]
 addons_path = /opt/odoo/odoo/addons,/opt/odoo/custom-addons
@@ -69,10 +58,10 @@ dbfilter = ^$DB_NAME\$
 logfile = /var/log/odoo/odoo.log
 EOF
 
-# Create Odoo systemd service
-cat <<EOF > /etc/systemd/system/smarterp.service
+# Create systemd service
+cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
-Description=SmartERP
+Description=Odoo
 Requires=postgresql.service
 After=network.target postgresql.service
 
@@ -91,64 +80,23 @@ EOF
 
 # Start service
 systemctl daemon-reload
-systemctl enable smarterp
-systemctl start smarterp
+systemctl enable odoo
+systemctl start odoo
 
-# Wait for Odoo to be available
-sleep 15
+# Wait for startup
+sleep 20
 
-# Create database
-/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --without-demo=all --init base --admin-password $ADMIN_PASSWORD
+# Create DB and install base
+/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin \
+    -d $DB_NAME --without-demo=all --init base --admin-password $ADMIN_PASSWORD
 
-# Auto-create admin user
-PGPASSWORD=odoo psql -U odoo -d $DB_NAME -h localhost <<EOF
-UPDATE res_users SET login='admin', password='\$pbkdf2-sha512\$25000\$sH0WYoWZXX9SccC3B6tM0g\$HXvxMHmW3lZlNB9f0Eq0h1l3wDAECaUIMb0fWcsTrXPh9DR3P8WUGSYjoDRBiYBr51T5XTl61p59ltU6wUwhtA' WHERE id=1;
-EOF
-
-# Install all modules automatically
-/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --load-language=en_US --log-level=info -i $(ls /opt/odoo/custom-addons | tr '\n' ',' | sed 's/,$//') --stop-after-init
-
-# Setup Nginx
-cat <<EOF > /etc/nginx/sites-available/odoo
-server {
-    listen 80;
-    server_name $DOMAIN;
-
-    proxy_read_timeout 720s;
-    proxy_connect_timeout 720s;
-    proxy_send_timeout 720s;
-
-    proxy_set_header X-Forwarded-Host \$host;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Real-IP \$remote_addr;
-
-    access_log /var/log/nginx/odoo.access.log;
-    error_log /var/log/nginx/odoo.error.log;
-
-    location / {
-        proxy_pass http://127.0.0.1:8069;
-        proxy_redirect off;
-    }
-    location /longpolling/ {
-        proxy_pass http://127.0.0.1:8072;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/
-rm /etc/nginx/sites-enabled/default
-systemctl reload nginx
-
-# Setup SSL with Certbot
-certbot --nginx -d $DOMAIN --email $EMAIL --agree-tos --redirect --non-interactive
-
-# Finish
+# Done
 clear
-echo "==============================="
-echo "🎉 SmartERP Installation DONE 🎉"
-echo "==============================="
-echo "URL: https://$DOMAIN"
+echo "============================="
+echo " Odoo 18 Installation DONE "
+echo "============================="
+echo "Access it on: http://your-server-ip:8069"
+echo "Login: admin"
+echo "Password: admin"
 echo "Database: $DB_NAME"
-echo "Admin Password: admin"
-echo "==============================="
+echo "============================="
