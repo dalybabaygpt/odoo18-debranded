@@ -1,13 +1,217 @@
-812ea6b2e0dbd9134d3c78c1d7b892640c896b
-  Building wheel for vobject (pyproject.toml) ... done
-  Created wheel for vobject: filename=vobject-0.9.6.1-py3-none-any.whl size=47546 sha256=3b35b00836bde2a521a310c2f78355f1191ea2e554247cc73ccdd0237bb3ab14
-  Stored in directory: /opt/erp/everycrm/.cache/pip/wheels/4c/04/1b/8f3080b6086b78a723aee61095a625347ddabc573ab1c293bc
-  Building wheel for docopt (pyproject.toml) ... done
-  Created wheel for docopt: filename=docopt-0.6.2-py2.py3-none-any.whl size=13781 sha256=e58cde9f12d6ab4fa100c8f525a49ff0f2828ef0353626513c7780799a94c4f9
-  Stored in directory: /opt/erp/everycrm/.cache/pip/wheels/1a/bf/a1/4cee4f7678c68c5875ca89eaccf460593539805c3906722228
-Successfully built ofxparse psycopg2 python-ldap rjsmin vobject docopt
-Installing collected packages: xlwt, rjsmin, pytz, python-stdnum, pyserial, pypng, polib, passlib, docopt, asn1crypto, XlsxWriter, xlrd, urllib3, typing-extensions, soupsieve, six, setuptools, pyusb, PyPDF2, pycparser, pyasn1, psycopg2, psutil, platformdirs, Pillow, num2words, maxminddb, MarkupSafe, lxml, libsass, isodate, idna, greenlet, et-xmlfile, docutils, decorator, charset-normalizer, chardet, certifi, cbor2, Babel, attrs, zope.interface, zope.event, Werkzeug, requests, reportlab, qrcode, python-dateutil, pyasn1_modules, openpyxl, lxml-html-clean, Jinja2, cffi, beautifulsoup4, vobject, requests-toolbelt, requests-file, python-ldap, ofxparse, gevent, geoip2, freezegun, cryptography, zeep, pyopenssl
-Successfully installed Babel-2.10.3 Jinja2-3.1.2 MarkupSafe-2.1.5 Pillow-10.2.0 PyPDF2-2.12.1 Werkzeug-3.0.1 XlsxWriter-3.1.9 asn1crypto-1.5.1 attrs-25.3.0 beautifulsoup4-4.13.4 cbor2-5.6.2 certifi-2025.4.26 cffi-1.17.1 chardet-5.2.0 charset-normalizer-3.4.1 cryptography-42.0.8 decorator-5.1.1 docopt-0.6.2 docutils-0.20.1 et-xmlfile-2.0.0 freezegun-1.2.1 geoip2-2.9.0 gevent-24.2.1 greenlet-3.0.3 idna-3.6 isodate-0.7.2 libsass-0.22.0 lxml-5.2.1 lxml-html-clean-0.4.2 maxminddb-2.6.3 num2words-0.5.13 ofxparse-0.21 openpyxl-3.1.2 passlib-1.7.4 platformdirs-4.3.7 polib-1.1.1 psutil-5.9.8 psycopg2-2.9.9 pyasn1-0.6.1 pyasn1_modules-0.4.2 pycparser-2.22 pyopenssl-24.1.0 pypng-0.20220715.0 pyserial-3.5 python-dateutil-2.8.2 python-ldap-3.4.4 python-stdnum-1.19 pytz-2025.2 pyusb-1.2.1 qrcode-7.4.2 reportlab-4.1.0 requests-2.31.0 requests-file-2.1.0 requests-toolbelt-1.0.0 rjsmin-1.2.0 setuptools-80.1.0 six-1.17.0 soupsieve-2.7 typing-extensions-4.13.2 urllib3-2.0.7 vobject-0.9.6.1 xlrd-2.0.1 xlwt-1.3.0 zeep-4.2.1 zope.event-5.0 zope.interface-7.2
-🚀 Initializing ERP database...
-sudo -u everycrm /opt/erp/everycrm/venv/bin/python3 /opt/erp/everycrm/server/odoo-bin server   -c /etc/erp/everycrm.conf   -d everycrm   -i base   --without-demo=all   --load-language=en_US   --stop-after-init
-root@everycrm:~# 
+#!/usr/bin/env bash
+
+# Generic ERP Full Auto-Installer
+# Supports Ubuntu 22.04 and 24.04
+set -e
+clear
+
+echo "========================================="
+echo "   Generic ERP Full Auto-Installer       "
+echo "========================================="
+
+# -- User Inputs --
+read -p "Enter ERP project name (example: myerp): " PROJECT_NAME
+read -p "Enter domain (leave blank for IP-only): " DOMAIN
+read -s -p "Enter admin password for database: " ADMIN_PASSWORD
+echo
+
+# -- OS Check --
+UBX=$(lsb_release -rs)
+if [[ "$UBX" != "22.04" && "$UBX" != "24.04" ]]; then
+  echo "❌ Unsupported Ubuntu version: $UBX. Only 22.04 or 24.04 supported."
+  exit 1
+fi
+echo "✅ Ubuntu $UBX detected."
+
+# -- Dependencies --
+apt update
+DEPS=(git wget curl python3-venv python3-pip python3-wheel python3-dev build-essential \
+       libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev \
+       libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql nginx)
+for pkg in "${DEPS[@]}"; do apt install -y "$pkg"; done
+
+# -- Certbot --
+if ! command -v certbot &>/dev/null; then
+  if [[ "$UBX" == "24.04" ]]; then
+    snap install core && snap refresh core && snap install --classic certbot
+    ln -sf /snap/bin/certbot /usr/bin/certbot
+  else
+    apt install -y certbot python3-certbot-nginx
+  fi
+fi
+
+# -- PostgreSQL --
+systemctl enable postgresql && systemctl start postgresql
+# Create role
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_NAME'" | grep -q 1 || \
+  sudo -u postgres createuser --createdb "$PROJECT_NAME"
+# Create database
+sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME" || \
+  sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
+echo "✅ PostgreSQL user & database '$PROJECT_NAME' ready."
+
+# -- Setup ERP directories --
+ERP_ROOT=/opt/erp/$PROJECT_NAME
+mkdir -p "$ERP_ROOT"/server "$ERP_ROOT"/custom_addons "$ERP_ROOT"/venv
+useradd -m -d "$ERP_ROOT" -s /bin/bash "$PROJECT_NAME" 2>/dev/null || true
+chown -R "$PROJECT_NAME":"$PROJECT_NAME" "$ERP_ROOT"
+
+# -- Clone Odoo 18 CE --
+if [[ ! -d "$ERP_ROOT/server/.git" ]]; then
+  sudo -u "$PROJECT_NAME" git clone --depth 1 --branch 18.0 https://github.com/odoo/odoo.git "$ERP_ROOT/server"
+fi
+
+# -- Python venv & requirements --
+sudo -u "$PROJECT_NAME" python3 -m venv "$ERP_ROOT/venv"
+sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install --upgrade pip wheel
+sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install -r "$ERP_ROOT/server/requirements.txt" || true
+
+echo "✅ Python virtualenv and dependencies installed."
+
+# -- Configuration --
+mkdir -p /etc/erp
+cat > /etc/erp/$PROJECT_NAME.conf <<EOF
+[options]
+admin_passwd = $ADMIN_PASSWORD
+db_host = False
+db_port = False
+db_user = $PROJECT_NAME
+db_password = False
+addons_path = $ERP_ROOT/server/addons,$ERP_ROOT/custom_addons
+logfile = /var/log/$PROJECT_NAME/odoo.log
+proxy_mode = True
+workers = 2
+EOF
+
+# create log directory
+mkdir -p /var/log/$PROJECT_NAME
+touch /var/log/$PROJECT_NAME/odoo.log
+chown -R "$PROJECT_NAME":"$PROJECT_NAME" /var/log/$PROJECT_NAME
+
+# -- Database Init --
+echo "🚀 Initializing database and base module..."
+sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
+  -c /etc/erp/$PROJECT_NAME.conf \
+  -d "$PROJECT_NAME" \
+  -i base \
+  --without-demo=all \
+  --load-language=en_US \
+  --stop-after-init
+
+echo "✅ Database initialized."
+
+# -- systemd service --
+cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
+[Unit]
+Description=$PROJECT_NAME ERP Service
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=$PROJECT_NAME
+Group=$PROJECT_NAME
+ExecStart=$ERP_ROOT/venv/bin/python3 $ERP_ROOT/server/odoo-bin -c /etc/erp/$PROJECT_NAME.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+test -f /etc/systemd/system/$PROJECT_NAME.service && systemctl enable $PROJECT_NAME && systemctl start $PROJECT_NAME
+
+echo "✅ systemd service '$PROJECT_NAME' started."
+
+# -- Nginx config --
+if [[ -n "$DOMAIN" ]]; then
+  echo "🌐 Configuring Nginx for domain '$DOMAIN'..."
+  # HTTP->HTTPS
+  cat > /etc/nginx/sites-available/$PROJECT_NAME <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+EOF
+  # HTTPS site
+  cat >> /etc/nginx/sites-available/$PROJECT_NAME <<EOF
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    client_max_body_size 100M;
+    proxy_read_timeout 86400;
+    proxy_connect_timeout 86400;
+    proxy_send_timeout 86400;
+
+    location / {
+        proxy_pass http://127.0.0.1:8069;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+    }
+    location /longpolling {
+        proxy_pass http://127.0.0.1:8072;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+    }
+}
+EOF
+  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl reload nginx
+  # SSL issuance
+  if ping -c1 "$DOMAIN" &>/dev/null; then
+    certbot --nginx -d "$DOMAIN" --agree-tos --non-interactive --register-unsafely-without-email || 
+      echo "⚠️ SSL issuance failed; proceeding without SSL."
+  else
+    echo "⚠️ DNS not ready for $DOMAIN; skipping SSL issuance."
+  fi
+else
+  echo "🌐 No domain provided. Configuring default Nginx proxy..."
+  cat > /etc/nginx/sites-available/default <<EOF
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:8069;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+    }
+    location /longpolling {
+        proxy_pass http://127.0.0.1:8072;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+    }
+}
+EOF
+  nginx -t && systemctl reload nginx
+fi
+
+# -- Done --
+clear
+ echo "========================================="
+ echo " 🎉 Installation Complete for $PROJECT_NAME 🎉"
+ echo "========================================="
+ echo " Access your ERP:"
+ if [[ -n "$DOMAIN" ]]; then
+   echo "   https://$DOMAIN"
+ else
+   echo "   http://$(hostname -I | awk '{print $1}'):8069"
+ fi
+ echo " Default login: admin / $ADMIN_PASSWORD"
+ echo "========================================="
