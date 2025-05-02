@@ -50,7 +50,14 @@ sudo -u "$PROJECT_NAME" git clone --depth 1 --branch 18.0 https://github.com/odo
 # === Python venv ===
 sudo -u "$PROJECT_NAME" python3 -m venv "$ERP_ROOT/venv"
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install --upgrade pip wheel
-sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install -r "$ERP_ROOT/server/requirements.txt" || true
+
+# Retry requirements install up to 3 times
+for i in {1..3}; do
+  sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install -r "$ERP_ROOT/server/requirements.txt" && break || {
+    echo "⚠️ Attempt $i to install Python requirements failed. Retrying..."
+    sleep 2
+  }
+done
 
 # === ERP Config ===
 echo "⚙️ Writing config file..."
@@ -83,7 +90,11 @@ chown $PROJECT_NAME /etc/authbind/byport/80
 echo "🚀 Initializing ERP database safely (port 8769)..."
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
   -c "/etc/erp/$PROJECT_NAME.conf" -d "$PROJECT_NAME" -i base \
-  --without-demo=all --load-language=en_US --stop-after-init || { echo "❌ ERP init failed"; exit 1; }
+  --without-demo=all --load-language=en_US --stop-after-init || {
+  echo "❌ ERP init failed"
+  journalctl -xe
+  exit 1
+}
 
 # === Update config for port 80 ===
 sed -i 's/http_port = 8769/http_port = 80/' "/etc/erp/$PROJECT_NAME.conf"
@@ -118,7 +129,8 @@ echo "🌐 Verifying HTTP access on port 80..."
 if curl -s --head http://127.0.0.1 | grep -i '200 OK' > /dev/null; then
   echo "✅ ERP is accessible on port 80."
 else
-  echo "❌ ERP failed to respond on port 80. Check systemd logs with: journalctl -u $PROJECT_NAME --no-pager"
+  echo "❌ ERP failed to respond on port 80. Check logs: journalctl -u $PROJECT_NAME --no-pager"
+  exit 1
 fi
 
 # === Final Info ===
