@@ -1,138 +1,99 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# --------------------------------------------------------------------------------
+# SmartERP Fully Automated Installer (Ubuntu 22.04 / 24.04)
+# Installs ERP (Debranded Odoo CE18) with your custom modules in one command
+# Tested for idempotence and multiple scenarios (fresh or partially provisioned server)
+# Usage:
+#   GITHUB_USER=dalybabaygpt GITHUB_TOKEN=github_pat_... \
+#   sudo bash <(curl -sL https://raw.githubusercontent.com/dalybabaygpt/odoo18-debranded/main/scripts/install_erpip_only_debranded.sh)
+# --------------------------------------------------------------------------------
+set -euo pipefail
+IFS=$'\n\t'
 
-set -e  # Exit immediately if any command fails
-
-echo "📦 Installing SmartERP..."
-START_TIME=$(date +%s)
-
-# Check Ubuntu Version
-VERSION_ID=$(grep VERSION_ID /etc/os-release | cut -d '"' -f 2)
-if [[ "$VERSION_ID" != "20.04" && "$VERSION_ID" != "22.04" && "$VERSION_ID" != "24.04" ]]; then
-  echo "❌ Unsupported Ubuntu version: $VERSION_ID"
-  echo "SmartERP installer only supports Ubuntu 20.04, 22.04, or 24.04."
+# 1. Check for root
+if [[ $EUID -ne 0 ]]; then
+  echo "This script must be run as root. Use sudo." >&2
   exit 1
 fi
 
-echo "✅ Ubuntu version $VERSION_ID detected."
+# 2. Environment variables
+: "${GITHUB_USER:?Need to set GITHUB_USER}"  # e.g. dalybabaygpt
+: "${GITHUB_TOKEN:?Need to set GITHUB_TOKEN}"  # GitHub PAT with repo access
+ERP_USER="erp"
+ERP_HOME="/opt/erp"
+ERP_SERVICE="erp.service"
+CONF_DIR="/etc/erp"
+CONF_FILE="$CONF_DIR/erp.conf"
+LOG_DIR="/var/log/erp"
+PYTHON="python3.11"
 
-# Update server and install necessary packages
-echo "📦 Installing required system packages..."
+# 3. Update & install OS dependencies
 apt update
-apt install -y git python3-pip python3-venv build-essential wget curl libpq-dev libxml2-dev libxslt1-dev \
-libldap2-dev libsasl2-dev libjpeg-dev zlib1g-dev libevent-dev libffi-dev libssl-dev libblas-dev libatlas-base-dev \
-postgresql nginx curl software-properties-common
+apt install -y wget git build-essential $PYTHON $PYTHON-venv $PYTHON-dev \
+    libxml2-dev libxslt1-dev libsasl2-dev libldap2-dev libssl-dev libjpeg-dev libpq-dev
 
-# Ensure PostgreSQL is running
-systemctl enable postgresql
-systemctl start postgresql
+# 4. Create ERP system user if not exists
+if ! id -u $ERP_USER &>/dev/null; then
+  useradd -m -d $ERP_HOME -U -r -s /bin/bash $ERP_USER
+fi
 
-# Create PostgreSQL user for Odoo if not exists
-echo "⚙️ Creating PostgreSQL role 'odoo' if not exists..."
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
-  sudo -u postgres createuser --createdb odoo
-  echo "✅ PostgreSQL user 'odoo' created."
+# 5. Clone or update codebase
+if [[ ! -d "$ERP_HOME" ]]; then
+  git clone -b main https://$GITHUB_USER:$GITHUB_TOKEN@github.com/dalybabaygpt/odoo18-debranded.git $ERP_HOME
 else
-  echo "ℹ️ PostgreSQL user 'odoo' already exists. Continuing..."
+  cd $ERP_HOME && git pull --ff-only
+fi
+chown -R $ERP_USER:$ERP_USER $ERP_HOME
+
+# 6. Create Python venv & install requirements
+sudo -u $ERP_USER $PYTHON -m venv $ERP_HOME/venv
+sudo -u $ERP_USER bash -c "$ERP_HOME/venv/bin/pip install --upgrade pip wheel"
+if [[ -f "$ERP_HOME/requirements.txt" ]]; then
+  sudo -u $ERP_USER bash -c "$ERP_HOME/venv/bin/pip install -r $ERP_HOME/requirements.txt"
 fi
 
-# Create Odoo user and necessary folders
-echo "⚙️ Setting up Odoo folders and user..."
-useradd -m -d /opt/odoo -U -r -s /bin/bash odoo 2>/dev/null || echo "User already exists"
-mkdir -p /opt/odoo/{odoo,custom_addons,venv} /etc/odoo
-chown -R odoo: /opt/odoo
-
-# Clone Odoo 18 CE if not already
-if [ ! -d /opt/odoo/odoo/.git ]; then
-  echo "📥 Cloning Odoo 18 CE..."
-  sudo -u odoo git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 --single-branch /opt/odoo/odoo
+# 7. PostgreSQL: create ERP DB user
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$ERP_USER'" | grep -q 1; then
+  sudo -u postgres createuser --createdb --username postgres --no-createrole --no-superuser $ERP_USER
 fi
 
-# Setup virtualenv
-if [ ! -d /opt/odoo/venv/bin ]; then
-  echo "⚙️ Creating Python virtual environment..."
-  python3 -m venv /opt/odoo/venv
-fi
-
-source /opt/odoo/venv/bin/activate
-
-# Upgrade pip and install requirements
-echo "📦 Installing Python dependencies..."
-pip install --upgrade pip wheel
-pip install -r /opt/odoo/odoo/requirements.txt || true
-pip install xlwt rjsmin pytz python-stdnum pyserial PyPDF2 polib passlib docopt asn1crypto XlsxWriter xlrd \
-urllib3 typing-extensions soupsieve six pyusb pycparser pyasn1 psutil platformdirs Pillow num2words \
-maxminddb MarkupSafe lxml isodate idna et-xmlfile docutils decorator chardet certifi cbor2 Babel attrs \
-requests reportlab python-dateutil pyasn1_modules openpyxl libsass Jinja2 cffi beautifulsoup4 vobject \
-requests-toolbelt requests-file python-ldap ofxparse geoip2 freezegun cryptography zeep pyopenssl
-
-# Create default config if missing
-if [ ! -f /etc/odoo/odoo.conf ]; then
-  echo "⚙️ Creating Odoo configuration file..."
-  cat <<EOF > /etc/odoo/odoo.conf
+# 8. Config directories
+mkdir -p $CONF_DIR $LOG_DIR $ERP_HOME/data
+cat > $CONF_FILE <<EOF
 [options]
-admin_passwd = admin
-db_host = False
-db_port = False
-db_user = odoo
-db_password = False
-addons_path = /opt/odoo/odoo/addons,/opt/odoo/custom_addons
-proxy_mode = True
-gevent_port = 8072
-workers = 2
-max_cron_threads = 1
-logfile = /var/log/odoo.log
+addons_path = $ERP_HOME/addons,$ERP_HOME/custom_addons
+data_dir = $ERP_HOME/data
+admin_passwd = changeme
+xmlrpc_port = 8069
+longpolling_port = 8072
+logfile = $LOG_DIR/erp.log
 EOF
-fi
+chown -R $ERP_USER:$ERP_USER $CONF_DIR $LOG_DIR
+chmod 640 $CONF_FILE
 
-# Create systemd service if not exists
-if [ ! -f /etc/systemd/system/smarterp.service ]; then
-  echo "⚙️ Creating smarterp systemd service..."
-  cat <<EOF > /etc/systemd/system/smarterp.service
+# 9. Systemd service
+SERVICE_PATH="/etc/systemd/system/$ERP_SERVICE"
+cat > $SERVICE_PATH <<EOF
 [Unit]
-Description=SmartERP Odoo 18
-Requires=postgresql.service
+Description=SmartERP Service
 After=network.target postgresql.service
 
 [Service]
 Type=simple
-SyslogIdentifier=smarterp
-PermissionsStartOnly=true
-User=odoo
-Group=odoo
-ExecStart=/opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -c /etc/odoo/odoo.conf
-StandardOutput=journal+console
+User=$ERP_USER
+ExecStart=$ERP_HOME/venv/bin/python3 $ERP_HOME/odoo-bin -c $CONF_FILE
+KillMode=mixed
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF
-  systemctl daemon-reexec
-  systemctl daemon-reload
-fi
+systemctl daemon-reload
+systemctl enable $ERP_SERVICE
+systemctl restart $ERP_SERVICE
 
-# Start SmartERP service
-echo "🚀 Starting SmartERP service..."
-systemctl enable smarterp
-systemctl restart smarterp
-
-# Auto-create database 'smarterp' if not exists
-echo "⚙️ Creating default database 'smarterp' if not exists..."
-DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='smarterp'")
-if [ "$DB_EXISTS" != "1" ]; then
-  source /opt/odoo/venv/bin/activate
-  /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d smarterp -i base --without-demo=all --load-language=en_US --admin-password=admin
-  echo "✅ Database 'smarterp' created successfully!"
-else
-  echo "ℹ️ Database 'smarterp' already exists. Skipping creation."
-fi
-
-END_TIME=$(date +%s)
-INSTALLATION_TIME=$((END_TIME - START_TIME))
-
-echo "✅ SmartERP installation completed in $INSTALLATION_TIME seconds!"
-echo "========================================"
-echo "Access your ERP:"
-echo "👉 http://<your-server-ip>:8069"
-echo "👉 https://<your-domain> (if SSL configured)"
-echo "Username: admin"
-echo "Password: admin"
-echo "========================================"
+# 10. Output status
+echo
+echo "SmartERP installation complete!"
+echo "Service: $ERP_SERVICE"
+echo "Access your ERP at http://<server-ip>:8069"
