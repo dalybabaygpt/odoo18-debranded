@@ -147,22 +147,28 @@ echo "✅ systemd service '$PROJECT_NAME' started."
 
 # -- Nginx Configuration --
 echo "🌐 Configuring Nginx..."
-# Remove all existing sites
+# Remove all existing site configs and default conf
 rm -f /etc/nginx/sites-enabled/*
+rm -f /etc/nginx/conf.d/default.conf
 
 if [[ -n "$DOMAIN" ]]; then
   echo "🔗 Domain mode for $DOMAIN..."
+  # HTTP -> HTTPS redirect
   cat > /etc/nginx/sites-available/$PROJECT_NAME <<EOF
 server {
     listen 80;
+    listen [::]:80;
     server_name $DOMAIN;
     return 301 https://\$host\$request_uri;
 }
 EOF
+  # Secure site
   cat >> /etc/nginx/sites-available/$PROJECT_NAME <<EOF
 server {
     listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name $DOMAIN;
+
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
@@ -190,10 +196,12 @@ server {
     }
 }
 EOF
-  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/$PROJECT_NAME
   nginx -t && systemctl reload nginx
-  if ping -c1 "$DOMAIN" &>/dev/null; then
-    certbot --nginx -d "$DOMAIN" --agree-tos --non-interactive --register-unsafely-without-email || echo "⚠️ SSL issuance failed."
+
+  # Issue SSL if DNS resolves
+  if getent hosts "$DOMAIN" > /dev/null; then
+    certbot --nginx -d "$DOMAIN" --agree-tos --non-interactive --register-unsafely-without-email || echo "⚠️ SSL issuance failed; proceeding without SSL."
   else
     echo "⚠️ DNS not ready; skipping SSL issuance."
   fi
@@ -202,6 +210,7 @@ else
   cat > /etc/nginx/sites-available/default <<EOF
 server {
     listen 80 default_server;
+    listen [::]:80 default_server;
     server_name _;
     location / {
         proxy_pass http://127.0.0.1:8069;
@@ -220,11 +229,12 @@ server {
     }
 }
 EOF
-  ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+  ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
   nginx -t && systemctl reload nginx
 fi
 
-echo "\n========================================="
+echo "
+========================================="
 echo " 🎉 Installation Complete for $PROJECT_NAME 🎉"
 echo "========================================="
 echo " Access your ERP:"
@@ -233,5 +243,3 @@ if [[ -n "$DOMAIN" ]]; then
 else
   echo "   http://$(hostname -I | awk '{print $1}'):8069"
 fi
-echo " Default login: admin / $ADMIN_PASSWORD"
-echo "========================================="
