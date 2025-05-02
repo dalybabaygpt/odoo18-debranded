@@ -90,9 +90,9 @@ chown $PROJECT_NAME /etc/authbind/byport/80
 echo "🚀 Initializing ERP database safely (port 8769)..."
 sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
   -c "/etc/erp/$PROJECT_NAME.conf" -d "$PROJECT_NAME" -i base \
-  --without-demo=all --load-language=en_US --stop-after-init || {
-  echo "❌ ERP init failed"
-  journalctl -xe
+  --without-demo=all --load-language=en_US --stop-after-init > /tmp/odoo_init.log 2>&1 || {
+  echo "❌ ERP init failed. Log output below:"
+  cat /tmp/odoo_init.log
   exit 1
 }
 
