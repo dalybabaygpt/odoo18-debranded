@@ -93,7 +93,7 @@ EOF
 touch /var/log/$PROJECT_NAME.log
 chown $PROJECT_NAME: /var/log/$PROJECT_NAME.log
 
-# ---- Initialize Base Module (no ports) ----
+# ---- Initialize Base Module ----
 echo "🚀 Initializing ERP database modules..."
 sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_NAME/server/odoo-bin \
   -c /etc/erp/$PROJECT_NAME.conf \
@@ -101,12 +101,9 @@ sudo -u $PROJECT_NAME /opt/erp/$PROJECT_NAME/venv/bin/python3 /opt/erp/$PROJECT_
   -i base \
   --without-demo=all \
   --load-language=en_US \
-  --stop-after-init \
-  --http-port=0 \
-  --longpolling-port=0
+  --stop-after-init
 
-# ---- Systemd Service Setup ----
-cat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
+# ---- Systemd Service Setup ----ncat > /etc/systemd/system/$PROJECT_NAME.service <<EOF
 [Unit]
 Description=$PROJECT_NAME ERP Server
 Requires=postgresql.service
@@ -157,70 +154,5 @@ server {
   ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
   include /etc/letsencrypt/options-ssl-nginx.conf;
   ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-  location / {
-    proxy_pass http://127.0.0.1:8069;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto https;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection \$connection_upgrade;
-  }
-  location /longpolling {
-    proxy_pass http://127.0.0.1:8072;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection \$connection_upgrade;
-  }
-}
 EOF
-  ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
-  # remove default only if exists
-  rm -f /etc/nginx/sites-enabled/default || true
-  nginx -t && systemctl reload nginx
-
-  # SSL issuance
-  if ping -c1 "$DOMAIN" &>/dev/null; then
-    certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email || echo "⚠️ SSL issuance failed; continuing without SSL."
-  else
-    echo "⚠️ DNS not ready; skipping SSL issuance."
-  fi
-else
-  echo "🌐 Configuring default Nginx site to proxy ERP on port 80..."
-  # default catch-all
-  cat > /etc/nginx/sites-available/default <<EOF
-server {
-  listen 80 default_server;
-  server_name _;
-  map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }
-  location / {
-    proxy_pass http://127.0.0.1:8069;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto http;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection \$connection_upgrade;
-  }
-  location /longpolling {
-    proxy_pass http://127.0.0.1:8072;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection \$connection_upgrade;
-  }
-}
-EOF
-  nginx -t && systemctl reload nginx
-fi
-
-# ---- Finish ----
-clear
-echo "========================================="
-echo "🎉 $PROJECT_NAME installation complete! 🎉"
-echo "========================================="
-echo "Access URLs:"
-echo "  HTTP:  http://<SERVER_IP>:8069"
-[[ -n "$DOMAIN" ]] && echo "  HTTPS: https://$DOMAIN"
-echo "Default credentials: admin / $ADMIN_PASSWORD"
-echo "========================================="
+}]}
