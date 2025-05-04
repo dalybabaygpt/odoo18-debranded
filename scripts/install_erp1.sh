@@ -31,8 +31,15 @@ apt install -y git wget curl build-essential python3-dev python3-pip python3-ven
     libldap2-dev libsasl2-dev libffi-dev libjpeg-dev zlib1g-dev libevent-dev \
     libatlas-base-dev postgresql nginx ufw
 
-# PostgreSQL user setup
-su - postgres -c "psql -c \"CREATE USER odoo WITH PASSWORD 'odoo';\""
+# PostgreSQL user setup with CREATEDB
+su - postgres -c "psql -c \"DO \\\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'odoo') THEN
+      CREATE ROLE odoo LOGIN PASSWORD 'odoo' CREATEDB;
+   END IF;
+END
+\\\$;\""
+
 sed -i 's/^local\s\+all\s\+all\s\+.*/local   all             all                                     md5/' /etc/postgresql/*/main/pg_hba.conf
 sed -i 's/^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+.*/host    all             all             127.0.0.1\/32            md5/' /etc/postgresql/*/main/pg_hba.conf
 sed -i 's/^host\s\+all\s\+all\s\+::1\/128\s\+.*/host    all             all             ::1\/128                 md5/' /etc/postgresql/*/main/pg_hba.conf
@@ -93,7 +100,10 @@ systemctl start smarterp
 # Wait for boot
 sleep 15
 
-# Create DB
+# Create DB directly as postgres
+su - postgres -c "createdb $DB_NAME -O odoo"
+
+# Initialize base + install base module
 /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --without-demo=all --init base --admin-password $ADMIN_PASSWORD
 
 # Insert admin credentials
@@ -103,7 +113,7 @@ EOF
 
 # Install modules
 /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME -i \
-  $(ls /opt/odoo/custom-addons | tr '\n' ',' | sed 's/,\$//') --stop-after-init
+  $(ls /opt/odoo/custom-addons | tr '\n' ',' | sed 's/,\$//') --stop-after-init
 
 # Enable port & firewall
 ufw allow 8069
