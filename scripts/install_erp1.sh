@@ -6,9 +6,9 @@
 # Works on Ubuntu 22.04 and 24.04 — All fixes included
 # ===================================================
 
-read -p "Enter database name (example: smarterp): " DB_NAME
-read -p "Enter your GitHub username (for custom_addons clone): " GITHUB_USER
-read -p "Enter your GitHub token (for private repo access): " GITHUB_TOKEN
+DB_NAME="everycrm"
+GITHUB_USER="dalybabaygpt"
+GITHUB_TOKEN=""
 
 ADMIN_PASSWORD="time2fly"
 ODOO_LOGIN="admin"
@@ -106,9 +106,19 @@ su - postgres -c "createdb $DB_NAME -O odoo"
 # Initialize base + install base module
 /opt/odoo/venv/bin/python3 /opt/odoo/odoo/odoo-bin -d $DB_NAME --without-demo=all --init base --admin-password $ADMIN_PASSWORD
 
-# Insert admin credentials
-PGPASSWORD=odoo psql -U odoo -d $DB_NAME -h 127.0.0.1 <<EOF
-UPDATE res_users SET login='$ODOO_LOGIN', password='admin' WHERE id=1;
+# Securely set admin credentials using Odoo API
+/opt/odoo/venv/bin/python3 <<EOF
+import odoo
+import odoo.tools
+from odoo.service import db
+from odoo.modules.registry import Registry
+
+odoo.tools.config.parse_config(['/etc/odoo.conf'])
+registry = Registry('$DB_NAME')
+with registry.cursor() as cr:
+    env = odoo.api.Environment(cr, 1, {})
+    admin = env['res.users'].browse(1)
+    admin.write({'login': '$ODOO_LOGIN', 'password': '$ODOO_PASSWORD'})
 EOF
 
 # Install modules
