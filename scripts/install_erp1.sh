@@ -3,15 +3,15 @@
 # ===================================================
 #   Odoo CE 18 Installer (No Database Creation)
 # ===================================================
-# Installs Odoo Community 18 and your custom modules.
+# Installs Odoo Community 18 and your custom modules (public repo).
 # Does NOT create any database—create one manually via the web UI.
 
 set -euo pipefail
 
-# --- User configuration ---
-read -p "GitHub username for custom-addons repo (e.g. dalybabay): " GITHUB_USER
-read -p "GitHub token (leave empty if repo is public): " GITHUB_TOKEN
-read -p "Master password for Odoo database manager: " MASTER_PASSWORD
+# --- User configuration via environment ---
+#   You can override these by exporting before running.
+GITHUB_USER="${GITHUB_USER:-dalybabay}"
+MASTER_PASSWORD="${MASTER_PASSWORD:-time2fly}"
 
 # --- Install system dependencies ---
 apt update && apt upgrade -y
@@ -20,12 +20,11 @@ apt install -y git wget curl build-essential python3-dev python3-venv python3-pi
     libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql nginx ufw
 
 # --- PostgreSQL role setup ---
-# Create "odoo" role with CREATEDB if it doesn't exist
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
     sudo -u postgres psql -c "CREATE ROLE odoo LOGIN PASSWORD 'odoo' CREATEDB;"
 fi
 
-# Enforce md5 authentication for local connections
+# Enforce md5 authentication
 PG_HBA="/etc/postgresql/$(ls /etc/postgresql)/main/pg_hba.conf"
 sed -i "s/^local\s\+all\s\+all\s\+.*/local   all             all                                     md5/" "$PG_HBA"
 sed -i "s|^host\s\+all\s\+all\s\+127.0.0.1/32\s\+.*|host    all             all             127.0.0.1/32            md5|" "$PG_HBA"
@@ -33,10 +32,9 @@ sed -i "s|^host\s\+all\s\+all\s\+::1/128\s\+.*|host    all             all      
 systemctl restart postgresql
 
 # --- Odoo CE 18 installation ---
-mkdir -p /opt/odoo && cd /opt/odoo
-if [ ! -d odoo ]; then
-    git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 odoo
-fi
+rm -rf /opt/odoo && mkdir -p /opt/odoo
+cd /opt/odoo
+git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 odoo
 python3 -m venv /opt/odoo/venv
 source /opt/odoo/venv/bin/activate
 pip install --upgrade pip wheel
@@ -50,11 +48,7 @@ rm -rf "$CUSTOM_DIR"
 mkdir -p "$CUSTOM_DIR"
 TMP_DIR="/opt/odoo/tmp"
 rm -rf "$TMP_DIR"
-if [[ -n "$GITHUB_TOKEN" ]]; then
-    git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_USER/odoo18-debranded.git "$TMP_DIR"
-else
-    git clone https://github.com/$GITHUB_USER/odoo18-debranded.git "$TMP_DIR"
-fi
+git clone https://github.com/${GITHUB_USER}/odoo18-debranded.git "$TMP_DIR"
 if [ -d "$TMP_DIR/custom_addons" ]; then
     mv "$TMP_DIR/custom_addons"/* "$CUSTOM_DIR/"
 fi
