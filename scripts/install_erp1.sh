@@ -1,66 +1,71 @@
 #!/usr/bin/env bash
 
 # ===================================================
-#   Simple SmartERP Installer: Odoo CE 18 (No DB)
+#   Odoo CE 18 Installer (No Database Creation)
 # ===================================================
-# This script installs Odoo CE 18 Community Edition and your custom-addons
-# It sets up the Python environment, systemd service, and opens port 8069.
-# It DOES NOT create any database. You can create DB manually later.
+# Installs Odoo Community 18 and your custom modules.
+# Does NOT create any database—create one manually via the web UI.
 
 set -euo pipefail
 
-# --- Configuration ---
-GITHUB_USER="dalybabaygpt"              # your GitHub username
-GITHUB_TOKEN=""                         # your GitHub token (if private repo)
-MASTER_PASSWORD="time2fly"              # master password for odoo.conf
+# --- User configuration ---
+read -p "GitHub username for custom-addons repo (e.g. dalybabay): " GITHUB_USER
+read -p "GitHub token (leave empty if repo is public): " GITHUB_TOKEN
+read -p "Master password for Odoo database manager: " MASTER_PASSWORD
 
-# --- Install dependencies ---
+# --- Install system dependencies ---
 apt update && apt upgrade -y
-apt install -y git wget curl build-essential python3-dev python3-venv python3-pip \
+apt install -y git wget curl build-essential python3-dev python3-venv python3-pip python3-wheel \
     libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev \
     libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql nginx ufw
 
-# --- PostgreSQL user setup ---
-# Create a database role "odoo" if not exists
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1 || \
+# --- PostgreSQL role setup ---
+# Create "odoo" role with CREATEDB if it doesn't exist
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
     sudo -u postgres psql -c "CREATE ROLE odoo LOGIN PASSWORD 'odoo' CREATEDB;"
+fi
 
-# Adjust auth to md5
-sed -i 's/^local\s\+all\s\+all\s\+.*/local   all             all                                     md5/' \
-    /etc/postgresql/*/main/pg_hba.conf
-sed -i 's/^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+.*/host    all             all             127.0.0.1\/32            md5/' \
-    /etc/postgresql/*/main/pg_hba.conf
-sed -i 's/^host\s\+all\s\+all\s\+::1\/128\s\+.*/host    all             all             ::1\/128                 md5/' \
-    /etc/postgresql/*/main/pg_hba.conf
+# Enforce md5 authentication for local connections
+PG_HBA="/etc/postgresql/$(ls /etc/postgresql)/main/pg_hba.conf"
+sed -i "s/^local\s\+all\s\+all\s\+.*/local   all             all                                     md5/" "$PG_HBA"
+sed -i "s|^host\s\+all\s\+all\s\+127.0.0.1/32\s\+.*|host    all             all             127.0.0.1/32            md5|" "$PG_HBA"
+sed -i "s|^host\s\+all\s\+all\s\+::1/128\s\+.*|host    all             all             ::1/128                 md5|" "$PG_HBA"
 systemctl restart postgresql
 
-# --- Install Odoo CE 18 ---
-mkdir -p /opt/odoo
-cd /opt/odoo
-git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 odoo
-python3 -m venv venv
-source venv/bin/activate
+# --- Odoo CE 18 installation ---
+mkdir -p /opt/odoo && cd /opt/odoo
+if [ ! -d odoo ]; then
+    git clone https://github.com/odoo/odoo --depth 1 --branch 18.0 odoo
+fi
+python3 -m venv /opt/odoo/venv
+source /opt/odoo/venv/bin/activate
 pip install --upgrade pip wheel
 pip install -r odoo/requirements.txt
 
-echo "Cloned and installed Odoo CE 18"
+echo "✅ Odoo CE 18 core installed"
 
-# --- Install custom-addons ---
-mkdir -p /opt/odoo/custom-addons
+# --- Custom-addons installation ---
+CUSTOM_DIR="/opt/odoo/custom-addons"
+rm -rf "$CUSTOM_DIR"
+mkdir -p "$CUSTOM_DIR"
+TMP_DIR="/opt/odoo/tmp"
+rm -rf "$TMP_DIR"
 if [[ -n "$GITHUB_TOKEN" ]]; then
-    git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_USER/odoo18-debranded.git /opt/odoo/tmp
+    git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_USER/odoo18-debranded.git "$TMP_DIR"
 else
-    git clone https://github.com/$GITHUB_USER/odoo18-debranded.git /opt/odoo/tmp
+    git clone https://github.com/$GITHUB_USER/odoo18-debranded.git "$TMP_DIR"
 fi
-mv /opt/odoo/tmp/custom_addons/* /opt/odoo/custom-addons/
-rm -rf /opt/odoo/tmp
+if [ -d "$TMP_DIR/custom_addons" ]; then
+    mv "$TMP_DIR/custom_addons"/* "$CUSTOM_DIR/"
+fi
+rm -rf "$TMP_DIR"
 
-echo "Installed custom addons"
+echo "✅ Custom-addons installed to $CUSTOM_DIR"
 
-# --- Create odoo.conf ---
+# --- Odoo configuration file ---
 cat <<EOF > /etc/odoo.conf
 [options]
-addons_path = /opt/odoo/odoo/addons,/opt/odoo/custom-addons
+addons_path = /opt/odoo/odoo/addons,$CUSTOM_DIR
 admin_passwd = $MASTER_PASSWORD
 db_host = False
 db_port = False
@@ -69,10 +74,10 @@ db_password = odoo
 logfile = /var/log/odoo/odoo.log
 EOF
 
-# --- Systemd service ---
-cat <<EOF > /etc/systemd/system/smarterp.service
+# --- systemd service setup ---
+cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
-Description=SmartERP (Odoo 18)
+Description=Odoo Open Source ERP (Community Edition)
 Requires=postgresql.service
 After=network.target postgresql.service
 
@@ -88,18 +93,17 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable smarterp
-systemctl start smarterp
+systemctl enable odoo
+systemctl start odoo
 
-echo "Odoo service started"
+echo "✅ Odoo service started"
 
-# --- Open firewall ---
-ufw allow 8069
-echo "Port 8069 opened"
+# --- firewall ---
+ufw allow 8069/tcp
 
-# --- Done ---
 echo "================================"
 echo "Odoo CE 18 installed successfully"
-echo "Access: http://<server_ip>:8069"
-echo "Create your databases manually via the web UI"
+echo "Access it at: http://<server_ip>:8069"
+echo "Create your database via: http://<server_ip>:8069/web/database/create"
+echo "Use Master Password: $MASTER_PASSWORD"
 echo "================================"
