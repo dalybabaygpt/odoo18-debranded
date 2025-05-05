@@ -88,8 +88,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-enable smarterp
-start smarterp
+systemctl enable smarterp
+systemctl start smarterp
 
 echo "Odoo service started"
 
@@ -98,8 +98,8 @@ ufw allow 8069
 echo "Port 8069 opened"
 
 # --- Done ---
-echo "================================" 
-echo "Odoo CE 18 installed successfully" 
-echo "Access: http://<server_ip>:8069" 
-echo "Create your databases manually via the web UI" 
+echo "================================"
+echo "Odoo CE 18 installed successfully"
+echo "Access: http://<server_ip>:8069"
+echo "Create your databases manually via the web UI"
 echo "================================"
