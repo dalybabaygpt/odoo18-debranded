@@ -1,60 +1,69 @@
 #!/bin/bash
 
-echo "========== Updating system =========="
+echo "========== Updating System =========="
 apt update && apt upgrade -y
 
-echo "========== Installing required packages =========="
-apt install -y git wget curl build-essential libxslt1-dev libzip-dev libldap2-dev libsasl2-dev python3.12 python3.12-venv python3.12-dev libjpeg-dev libpq-dev libxml2-dev libffi-dev libtiff-dev libopenjp2-7-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev libxcb1-dev libx11-dev libxext-dev xfonts-75dpi xfonts-base libxrender1 libxext6 libx11-6 gdebi-core node-less npm
+echo "========== Installing Dependencies =========="
+apt install -y git wget curl python3-pip build-essential \
+  libxslt1-dev libzip-dev libldap2-dev libsasl2-dev python3-dev \
+  libjpeg-dev libpq-dev libxml2-dev libssl-dev libffi-dev \
+  zlib1g-dev libtiff-dev libopenjp2-7-dev libwebp-dev \
+  libharfbuzz-dev libfribidi-dev libxcb1-dev liblcms2-dev \
+  node-less npm libjpeg8-dev libpq-dev libxml2-dev libxslt1-dev \
+  python3-venv libjpeg-dev gdebi libpq-dev postgresql postgresql-client
 
-echo "========== Installing PostgreSQL =========="
-apt install -y postgresql
-sudo -u postgres createuser -s odoo18
+echo "========== Creating Odoo User and Directory =========="
+useradd -m -d /opt/odoo -U -r -s /bin/bash odoo18
+mkdir -p /opt/odoo
+chown odoo18:odoo18 /opt/odoo
 
-echo "========== Creating odoo user and directories =========="
-useradd -m -d /opt/odoo -U -r -s /bin/bash odoo
-mkdir -p /opt/odoo/odoo-custom-addons
-mkdir -p /opt/odoo/venv
+echo "========== Installing Wkhtmltopdf =========="
+wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.jammy_amd64.deb
+apt install -y ./wkhtmltox_0.12.6-1.jammy_amd64.deb
+rm wkhtmltox_0.12.6-1.jammy_amd64.deb
 
-echo "========== Installing wkhtmltopdf (Jammy-compatible) =========="
-cd /tmp
-wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.jammy_amd64.deb
-gdebi -n wkhtmltox_0.12.6-1.jammy_amd64.deb
-ln -s /usr/local/bin/wkhtmltopdf /usr/bin/wkhtmltopdf
-ln -s /usr/local/bin/wkhtmltoimage /usr/bin/wkhtmltoimage
-
-echo "========== Cloning Odoo 18 source =========="
+echo "========== Cloning Odoo 18 CE =========="
 cd /opt/odoo
-git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0 odoo-source
-chown -R odoo:odoo /opt/odoo/*
+sudo -u odoo18 git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0 odoo-source
 
-echo "========== Setting up Python 3.12 venv =========="
-python3.12 -m venv /opt/odoo/venv
+echo "========== Creating Python Virtual Environment =========="
+sudo -u odoo18 python3 -m venv /opt/odoo/venv
 source /opt/odoo/venv/bin/activate
 pip install wheel
 pip install -r /opt/odoo/odoo-source/requirements.txt
+deactivate
 
-echo "========== Pulling custom addons =========="
-cd /opt/odoo
-git clone https://github.com/dalybabaygpt/odoo18-debranded.git
-cp -r odoo18-debranded/custom_addons/* /opt/odoo/odoo-custom-addons/
+echo "========== PostgreSQL Setup =========="
+sudo -u postgres createuser -s odoo18 || true
 
-echo "========== Creating odoo.conf =========="
+read -sp "🔐 Enter the PostgreSQL master password to use with Odoo: " pg_pass
+echo
+sudo -u postgres psql -c "ALTER USER odoo18 WITH PASSWORD '$pg_pass';"
+
+# Update pg_hba.conf if necessary
+PG_HBA_FILE=$(sudo -u postgres psql -t -P format=unaligned -c "SHOW hba_file;")
+if ! grep -q "local\s\+all\s\+odoo18\s\+md5" "$PG_HBA_FILE"; then
+    echo "local   all             odoo18                                  md5" >> "$PG_HBA_FILE"
+    systemctl restart postgresql
+fi
+
+echo "========== Creating Configuration File =========="
 cat <<EOF > /etc/odoo.conf
 [options]
-admin_passwd = admin
+admin_passwd = $pg_pass
 db_host = False
 db_port = False
 db_user = odoo18
-db_password = False
-addons_path = /opt/odoo/odoo-source/addons,/opt/odoo/odoo-custom-addons
-logfile = /var/log/odoo/odoo.log
-data_dir = /opt/odoo/.local/share/Odoo
+db_password = $pg_pass
+addons_path = /opt/odoo/odoo-source/addons,/opt/odoo/custom
+logfile = /var/log/odoo18.log
 EOF
 
-mkdir -p /var/log/odoo
-chown -R odoo:odoo /var/log/odoo
+echo "========== Creating Custom Addons Directory =========="
+mkdir -p /opt/odoo/custom
+chown -R odoo18:odoo18 /opt/odoo
 
-echo "========== Creating systemd service =========="
+echo "========== Creating Systemd Service =========="
 cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
 Description=Odoo
@@ -65,8 +74,8 @@ After=network.target postgresql.service
 Type=simple
 SyslogIdentifier=odoo
 PermissionsStartOnly=true
-User=odoo
-Group=odoo
+User=odoo18
+Group=odoo18
 ExecStart=/opt/odoo/venv/bin/python3 /opt/odoo/odoo-source/odoo-bin -c /etc/odoo.conf
 StandardOutput=journal+console
 
@@ -74,10 +83,10 @@ StandardOutput=journal+console
 WantedBy=multi-user.target
 EOF
 
-echo "========== Enabling and starting Odoo service =========="
+echo "========== Starting Odoo =========="
 systemctl daemon-reexec
 systemctl daemon-reload
-systemctl enable odoo
-systemctl start odoo
+systemctl enable --now odoo
 
-echo "✅ DONE: Access your Odoo at http://YOUR_SERVER_IP:8069"
+echo "========== Odoo Installed Successfully! =========="
+echo "Access it at: http://YOUR_SERVER_IP:8069"
