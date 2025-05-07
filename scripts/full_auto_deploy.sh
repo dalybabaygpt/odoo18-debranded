@@ -168,7 +168,17 @@ EOF
   nginx -t && systemctl restart nginx
 
   echo -e "${GREEN}Obtaining Let's Encrypt SSL certificate...${NC}"
-  certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos -m $CERTBOT_EMAIL
+  if certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos -m $CERTBOT_EMAIL; then
+    echo -e "${GREEN}SSL certificate successfully installed.${NC}"
+  else
+    echo -e "\033[1;31m[ERROR] SSL certificate installation failed!\033[0m"
+    echo -e "Please ensure:"
+    echo -e "- Your domain ($DOMAIN_NAME) is pointing to this server IP"
+    echo -e "- Port 80/443 are open"
+    echo -e "- Cloudflare (if used) is set to 'Full' or 'Strict' mode, not 'Flexible'"
+    echo -e "You can rerun: certbot --nginx -d $DOMAIN_NAME -m $CERTBOT_EMAIL"
+    echo -e "Proceeding without valid SSL..."
+  fi
 
   echo -e "${GREEN}Setting up auto-renewal cron job...${NC}"
   echo "0 3 * * * root certbot renew --quiet && systemctl reload nginx" > /etc/cron.d/odoo_cert_renew
@@ -176,6 +186,6 @@ fi
 
 # ========= DONE =========
 echo -e "${GREEN}Odoo CE 18 installation complete.${NC}"
-echo "Access it via: http://$DOMAIN_NAME"
+echo "Access it via: http://${DOMAIN_NAME:-your-server-ip}:8069"
 echo "Database Master Password: $ADMIN_PASSWORD"
 echo "Custom Addons Folder: $CUSTOM_ADDONS_PATH"
