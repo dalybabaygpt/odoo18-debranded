@@ -28,12 +28,12 @@ apt update && apt upgrade -y
 
 # ========= DEPENDENCIES =========
 echo -e "${GREEN}Installing dependencies...${NC}"
-apt install -y git python3-pip build-essential wget python3-dev python3-venv \ 
-    libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \ 
-    node-less libjpeg-dev libpq-dev libxml2-dev zlib1g-dev libjpeg-dev \ 
-    libffi-dev libssl-dev libyaml-dev libopenblas-dev liblcms2-dev \ 
-    libblas-dev libatlas-base-dev libwebp-dev libtiff-dev libxrender1 \ 
-    xfonts-75dpi xfonts-base libjpeg8-dev gdebi unzip net-tools
+apt install -y git python3-pip build-essential wget python3-dev python3-venv \
+libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \
+node-less libjpeg-dev libpq-dev libxml2-dev zlib1g-dev libffi-dev \
+libssl-dev libyaml-dev libopenblas-dev liblcms2-dev libblas-dev \
+libatlas-base-dev libwebp-dev libtiff-dev libxrender1 xfonts-75dpi \
+xfonts-base libjpeg8-dev gdebi unzip net-tools
 
 # ========= POSTGRESQL =========
 echo -e "${GREEN}Installing PostgreSQL...${NC}"
@@ -41,22 +41,25 @@ apt install -y postgresql
 
 # ========= CREATE USER =========
 echo -e "${GREEN}Creating system user and PostgreSQL user...${NC}"
-adduser --system --home=$ODOO_HOME --group $ODOO_USER
-su - postgres -c "psql -c \"CREATE USER $ODOO_USER WITH PASSWORD '$POSTGRES_PASSWORD';\""
+adduser --system --home=$ODOO_HOME --group $ODOO_USER || true
+su - postgres -c "psql -c \"DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \$\$;\""
 su - postgres -c "psql -c \"ALTER ROLE $ODOO_USER CREATEDB;\""
 
 # ========= INSTALL ODOO =========
 echo -e "${GREEN}Cloning Odoo source...${NC}"
 mkdir -p $CUSTOM_ADDONS_PATH
 cd /opt
-git clone https://www.github.com/odoo/odoo --depth 1 --branch $ODOO_VERSION --single-branch
+if [ ! -d "$ODOO_HOME/odoo" ]; then
+  git clone https://www.github.com/odoo/odoo --depth 1 --branch $ODOO_VERSION --single-branch $ODOO_HOME/odoo
+fi
 
 echo -e "${GREEN}Creating Python virtualenv...${NC}"
 cd $ODOO_HOME
+apt install -y python3-venv
 python3 -m venv venv
 source venv/bin/activate
 pip3 install wheel
-pip3 install -r requirements.txt
+pip3 install -r odoo/requirements.txt
 
 # ========= CONFIG FILE =========
 echo -e "${GREEN}Creating config file...${NC}"
@@ -93,7 +96,7 @@ SyslogIdentifier=odoo
 PermissionsStartOnly=true
 User=$ODOO_USER
 Group=$ODOO_USER
-ExecStart=$ODOO_HOME/venv/bin/python3 $ODOO_HOME/odoo-bin -c $ODOO_CONF
+ExecStart=$ODOO_HOME/venv/bin/python3 $ODOO_HOME/odoo/odoo-bin -c $ODOO_CONF
 StandardOutput=journal+console
 
 [Install]
