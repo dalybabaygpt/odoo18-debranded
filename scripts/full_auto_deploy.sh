@@ -32,6 +32,13 @@ if [ "$INSTALL_NGINX" = "y" ]; then
   read -r DOMAIN_NAME
   echo "Enter your email for Let's Encrypt SSL registration (e.g. you@example.com):"
   read -r CERTBOT_EMAIL
+
+  echo -e "${GREEN}Checking if domain resolves...${NC}"
+  if ! ping -c 1 -W 2 "$DOMAIN_NAME" >/dev/null 2>&1; then
+    echo -e "\033[1;31m[ERROR] Domain $DOMAIN_NAME is not resolving!\033[0m"
+    echo "Ensure your domain points to this server's IP before running the installer."
+    exit 1
+  fi
 fi
 
 # ========= SYSTEM UPDATE =========
@@ -186,6 +193,10 @@ fi
 
 # ========= DONE =========
 echo -e "${GREEN}Odoo CE 18 installation complete.${NC}"
-echo "Access it via: http://${DOMAIN_NAME:-your-server-ip}:8069"
+if [ "$INSTALL_NGINX" = "y" ]; then
+  echo "Access it via: https://$DOMAIN_NAME"
+else
+  echo "Access it via: http://your-server-ip:8069"
+fi
 echo "Database Master Password: $ADMIN_PASSWORD"
 echo "Custom Addons Folder: $CUSTOM_ADDONS_PATH"
