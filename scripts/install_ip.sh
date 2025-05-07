@@ -1,94 +1,72 @@
 #!/bin/bash
 
-# ========== CONFIG ==========
-OE_USER="odoo"
-OE_HOME="/opt/$OE_USER"
-OE_VERSION="18.0"
-INSTALL_WKHTMLTOPDF="True"
-CUSTOM_ADDONS_REPO="https://github.com/dalybabaygpt/odoo18-debranded"
-CUSTOM_ADDONS_BRANCH="main"
-BIND_IP="93.189.95.5"
-# =============================
+# Exit on error
+set -e
 
-echo "STEP 1: Updating and Installing Dependencies"
+# Variables
+ODOO_VERSION=18.0
+ODOO_USER=odoo
+ODOO_HOME=/opt/odoo
+ODOO_CONF=/etc/odoo.conf
+PYTHON_VERSION=3.10
+
+echo "========== Updating system =========="
 apt update && apt upgrade -y
-apt install -y python3-pip build-essential wget git python3-dev python3-venv \
-  libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \
-  node-less libjpeg-dev libpq-dev libxml2-dev libffi-dev libssl-dev \
-  libxrender1 libxext6 xfonts-75dpi xfonts-base libjpeg8-dev zlib1g-dev \
-  fonts-noto fonts-noto-cjk unzip curl nginx
 
-echo "STEP 2: Creating Odoo User"
-useradd -m -d $OE_HOME -U -r -s /bin/bash $OE_USER
+echo "========== Installing dependencies =========="
+apt install -y git python${PYTHON_VERSION} python3-pip build-essential wget   python3-venv python3-dev libxslt-dev libzip-dev libldap2-dev libsasl2-dev   libpq-dev libjpeg-dev libjpeg8-dev liblcms2-dev libblas-dev libatlas-base-dev   libssl-dev libffi-dev libxml2-dev zlib1g-dev libfreetype6-dev libjpeg8   libpq-dev libxrender1 libxext6 libx11-dev xfonts-75dpi xfonts-base   libtiff5-dev libopenjp2-7 libharfbuzz-dev libfribidi-dev libxcb1-dev
 
-echo "STEP 3: Installing PostgreSQL"
-apt install -y postgresql
-su - postgres -c "createuser -s $OE_USER" || true
+echo "========== Creating Odoo user and directories =========="
+adduser --system --home=${ODOO_HOME} --group ${ODOO_USER} || true
 
-echo "STEP 4: Cloning Odoo CE 18"
-mkdir -p $OE_HOME && cd $OE_HOME
-git clone https://github.com/odoo/odoo --depth 1 --branch $OE_VERSION --single-branch .
-python3 -m venv venv
-source venv/bin/activate
-pip install wheel
-pip install -r requirements.txt
+echo "========== Cloning Odoo CE v18 =========="
+git clone https://www.github.com/odoo/odoo --depth 1 --branch ${ODOO_VERSION} ${ODOO_HOME}
 
-echo "STEP 5: Installing Wkhtmltopdf"
-if [ "$INSTALL_WKHTMLTOPDF" = "True" ]; then
-  wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb
-  apt install -y ./wkhtmltox_0.12.6-1.focal_amd64.deb
-fi
+echo "========== Creating virtual environment =========="
+python${PYTHON_VERSION} -m venv ${ODOO_HOME}/venv
+${ODOO_HOME}/venv/bin/pip install -U pip setuptools wheel
 
-echo "STEP 6: Cloning Custom Addons"
-mkdir -p $OE_HOME/custom_addons
-cd $OE_HOME/custom_addons
-git init
-git remote add origin $CUSTOM_ADDONS_REPO
-git config core.sparseCheckout true
-echo "custom_addons/" >> .git/info/sparse-checkout
-git pull origin $CUSTOM_ADDONS_BRANCH
+echo "========== Installing Python requirements =========="
+${ODOO_HOME}/venv/bin/pip install -r ${ODOO_HOME}/requirements.txt
 
-echo "STEP 7: Creating Config File"
-cat <<EOF > /etc/odoo.conf
+echo "========== Creating odoo.conf =========="
+cat <<EOF > ${ODOO_CONF}
 [options]
 admin_passwd = admin
 db_host = False
 db_port = False
-db_user = $OE_USER
+db_user = odoo
 db_password = False
-addons_path = $OE_HOME/addons,$OE_HOME/custom_addons/custom_addons
+addons_path = ${ODOO_HOME}/addons
 logfile = /var/log/odoo/odoo.log
-log_level = info
-xmlrpc_interface = $BIND_IP
-limit_memory_soft = 640000000
-limit_memory_hard = 760000000
-limit_request = 8192
-limit_time_cpu = 60
-limit_time_real = 120
-workers = 2
 EOF
 
-echo "STEP 8: Creating Odoo Service"
+chown ${ODOO_USER}:${ODOO_USER} ${ODOO_CONF}
+chmod 640 ${ODOO_CONF}
+
+echo "========== Creating systemd service =========="
 cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
 Description=Odoo
+Requires=postgresql.service
 After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=$OE_USER
-Group=$OE_USER
-ExecStart=$OE_HOME/venv/bin/python3 $OE_HOME/odoo-bin -c /etc/odoo.conf
-Restart=always
+SyslogIdentifier=odoo
+PermissionsStartOnly=true
+User=${ODOO_USER}
+Group=${ODOO_USER}
+ExecStart=${ODOO_HOME}/venv/bin/python3 ${ODOO_HOME}/odoo-bin -c ${ODOO_CONF}
+StandardOutput=journal+console
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo "STEP 9: Start Odoo Service"
+echo "========== Reloading and starting Odoo =========="
 systemctl daemon-reexec
 systemctl daemon-reload
 systemctl enable odoo
 systemctl start odoo
-
-echo "✅ DONE: Odoo CE 18 is installed and listening on http://$BIND_IP:8069"
+systemctl status odoo --no-pager
