@@ -1,48 +1,58 @@
 #!/bin/bash
 
-# Exit on error
-set -e
-
-# Variables
-ODOO_VERSION=18.0
-ODOO_USER=odoo
-ODOO_HOME=/opt/odoo
-ODOO_CONF=/etc/odoo.conf
-PYTHON_VERSION=3.10
-
 echo "========== Updating system =========="
 apt update && apt upgrade -y
 
-echo "========== Installing dependencies =========="
-apt install -y git python${PYTHON_VERSION} python3-pip build-essential wget   python3-venv python3-dev libxslt-dev libzip-dev libldap2-dev libsasl2-dev   libpq-dev libjpeg-dev libjpeg8-dev liblcms2-dev libblas-dev libatlas-base-dev   libssl-dev libffi-dev libxml2-dev zlib1g-dev libfreetype6-dev libjpeg8   libpq-dev libxrender1 libxext6 libx11-dev xfonts-75dpi xfonts-base   libtiff5-dev libopenjp2-7 libharfbuzz-dev libfribidi-dev libxcb1-dev
+echo "========== Installing required packages =========="
+apt install -y git wget curl build-essential libxslt1-dev libzip-dev libldap2-dev libsasl2-dev python3.12 python3.12-venv python3.12-dev libjpeg-dev libpq-dev libxml2-dev libffi-dev libtiff-dev libopenjp2-7-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev libxcb1-dev libx11-dev libxext-dev xfonts-75dpi xfonts-base libxrender1 libxext6 libx11-6 gdebi-core node-less npm
 
-echo "========== Creating Odoo user and directories =========="
-adduser --system --home=${ODOO_HOME} --group ${ODOO_USER} || true
+echo "========== Installing PostgreSQL =========="
+apt install -y postgresql
+sudo -u postgres createuser -s odoo18
 
-echo "========== Cloning Odoo CE v18 =========="
-git clone https://www.github.com/odoo/odoo --depth 1 --branch ${ODOO_VERSION} ${ODOO_HOME}
+echo "========== Creating odoo user and directories =========="
+useradd -m -d /opt/odoo -U -r -s /bin/bash odoo
+mkdir -p /opt/odoo/odoo-custom-addons
+mkdir -p /opt/odoo/venv
 
-echo "========== Creating virtual environment =========="
-python${PYTHON_VERSION} -m venv ${ODOO_HOME}/venv
-${ODOO_HOME}/venv/bin/pip install -U pip setuptools wheel
+echo "========== Installing wkhtmltopdf (Jammy-compatible) =========="
+cd /tmp
+wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.jammy_amd64.deb
+gdebi -n wkhtmltox_0.12.6-1.jammy_amd64.deb
+ln -s /usr/local/bin/wkhtmltopdf /usr/bin/wkhtmltopdf
+ln -s /usr/local/bin/wkhtmltoimage /usr/bin/wkhtmltoimage
 
-echo "========== Installing Python requirements =========="
-${ODOO_HOME}/venv/bin/pip install -r ${ODOO_HOME}/requirements.txt
+echo "========== Cloning Odoo 18 source =========="
+cd /opt/odoo
+git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0 odoo-source
+chown -R odoo:odoo /opt/odoo/*
+
+echo "========== Setting up Python 3.12 venv =========="
+python3.12 -m venv /opt/odoo/venv
+source /opt/odoo/venv/bin/activate
+pip install wheel
+pip install -r /opt/odoo/odoo-source/requirements.txt
+
+echo "========== Pulling custom addons =========="
+cd /opt/odoo
+git clone https://github.com/dalybabaygpt/odoo18-debranded.git
+cp -r odoo18-debranded/custom_addons/* /opt/odoo/odoo-custom-addons/
 
 echo "========== Creating odoo.conf =========="
-cat <<EOF > ${ODOO_CONF}
+cat <<EOF > /etc/odoo.conf
 [options]
 admin_passwd = admin
 db_host = False
 db_port = False
-db_user = odoo
+db_user = odoo18
 db_password = False
-addons_path = ${ODOO_HOME}/addons
+addons_path = /opt/odoo/odoo-source/addons,/opt/odoo/odoo-custom-addons
 logfile = /var/log/odoo/odoo.log
+data_dir = /opt/odoo/.local/share/Odoo
 EOF
 
-chown ${ODOO_USER}:${ODOO_USER} ${ODOO_CONF}
-chmod 640 ${ODOO_CONF}
+mkdir -p /var/log/odoo
+chown -R odoo:odoo /var/log/odoo
 
 echo "========== Creating systemd service =========="
 cat <<EOF > /etc/systemd/system/odoo.service
@@ -55,18 +65,19 @@ After=network.target postgresql.service
 Type=simple
 SyslogIdentifier=odoo
 PermissionsStartOnly=true
-User=${ODOO_USER}
-Group=${ODOO_USER}
-ExecStart=${ODOO_HOME}/venv/bin/python3 ${ODOO_HOME}/odoo-bin -c ${ODOO_CONF}
+User=odoo
+Group=odoo
+ExecStart=/opt/odoo/venv/bin/python3 /opt/odoo/odoo-source/odoo-bin -c /etc/odoo.conf
 StandardOutput=journal+console
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo "========== Reloading and starting Odoo =========="
+echo "========== Enabling and starting Odoo service =========="
 systemctl daemon-reexec
 systemctl daemon-reload
 systemctl enable odoo
 systemctl start odoo
-systemctl status odoo --no-pager
+
+echo "✅ DONE: Access your Odoo at http://YOUR_SERVER_IP:8069"
