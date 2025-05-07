@@ -1,142 +1,95 @@
-#!/usr/bin/env bash
-# Final Generic ERP Installer with Safe DB Init
-# Ubuntu 22.04 / 24.04 compatible with IP access via port 80
+#!/bin/bash
 
-set -e
-clear
+# ========== CONFIG ==========
+OE_USER="odoo"
+OE_HOME="/opt/$OE_USER"
+OE_VERSION="18.0"
+INSTALL_WKHTMLTOPDF="True"
+CUSTOM_ADDONS_REPO="https://github.com/dalybabaygpt/odoo18-debranded"
+CUSTOM_ADDONS_BRANCH="main"
+# =============================
 
-# === Banner ===
-echo "========================================="
-echo "   Generic ERP Full Auto-Installer       "
-echo "        (authbind | port 80 safe init)   "
-echo "========================================="
+echo "STEP 1: Updating and Installing Dependencies"
+apt update && apt upgrade -y
+apt install -y python3-pip build-essential wget git python3-dev python3-venv \
+  libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \
+  node-less libjpeg-dev libpq-dev libxml2-dev libffi-dev libssl-dev \
+  libxrender1 libxext6 xfonts-75dpi xfonts-base libjpeg8-dev zlib1g-dev \
+  fonts-noto fonts-noto-cjk unzip nginx curl
 
-# === Inputs ===
-read -p "Enter ERP project name (e.g. myerp): " PROJECT_NAME
-read -s -p "Enter admin password for database: " ADMIN_PASSWORD
-echo
+echo "STEP 2: Creating Odoo User"
+useradd -m -d $OE_HOME -U -r -s /bin/bash $OE_USER
 
-# === OS Check ===
-UBX=$(lsb_release -rs)
-if [[ "$UBX" != "22.04" && "$UBX" != "24.04" ]]; then
-  echo "❌ Ubuntu $UBX is not supported. Use 22.04 or 24.04."
-  exit 1
+echo "STEP 3: Installing and Activating PostgreSQL"
+apt install -y postgresql
+su - postgres -c "createuser -s $OE_USER" || true
+
+echo "STEP 4: Cloning Odoo CE 18 Source"
+mkdir -p $OE_HOME && cd $OE_HOME
+git clone https://github.com/odoo/odoo --depth 1 --branch $OE_VERSION --single-branch .
+python3 -m venv venv
+source venv/bin/activate
+pip install wheel
+pip install -r requirements.txt
+
+echo "STEP 5: Installing Wkhtmltopdf"
+if [ "$INSTALL_WKHTMLTOPDF" = "True" ]; then
+  wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb
+  apt install -y ./wkhtmltox_0.12.6-1.focal_amd64.deb
 fi
 
-# === Install Core Packages ===
-echo "📦 Installing required packages..."
-apt update && apt install -y git wget curl python3-venv python3-pip python3-wheel python3-dev \
-  build-essential libpq-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev \
-  libjpeg-dev zlib1g-dev libevent-dev libatlas-base-dev postgresql authbind
+echo "STEP 6: Cloning Custom Addons"
+mkdir -p $OE_HOME/custom_addons
+cd $OE_HOME/custom_addons
+git init
+git remote add origin $CUSTOM_ADDONS_REPO
+git config core.sparseCheckout true
+echo "custom_addons/" >> .git/info/sparse-checkout
+git pull origin $CUSTOM_ADDONS_BRANCH
 
-# === PostgreSQL Setup ===
-echo "🗄️ Setting up PostgreSQL..."
-systemctl enable postgresql && systemctl start postgresql
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$PROJECT_NAME'" | grep -q 1 || \
-  sudo -u postgres createuser --createdb "$PROJECT_NAME"
-sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "$PROJECT_NAME" || \
-  sudo -u postgres createdb -O "$PROJECT_NAME" "$PROJECT_NAME"
-
-# === ERP Project Structure ===
-ERP_ROOT="/opt/erp/$PROJECT_NAME"
-mkdir -p "$ERP_ROOT/server" "$ERP_ROOT/custom_addons" "$ERP_ROOT/venv"
-useradd -m -d "$ERP_ROOT" -s /bin/bash "$PROJECT_NAME" 2>/dev/null || true
-chown -R "$PROJECT_NAME":"$PROJECT_NAME" "$ERP_ROOT"
-
-# === Clone Odoo ===
-echo "📥 Cloning Odoo 18.0..."
-sudo -u "$PROJECT_NAME" git clone --depth 1 --branch 18.0 https://github.com/odoo/odoo.git "$ERP_ROOT/server"
-
-# === Python venv ===
-sudo -u "$PROJECT_NAME" python3 -m venv "$ERP_ROOT/venv"
-sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install --upgrade pip wheel
-
-# Retry requirements install up to 3 times
-for i in {1..3}; do
-  sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/pip" install -r "$ERP_ROOT/server/requirements.txt" && break || {
-    echo "⚠️ Attempt $i to install Python requirements failed. Retrying..."
-    sleep 2
-  }
-done
-
-# === ERP Config ===
-echo "⚙️ Writing config file..."
-mkdir -p /etc/erp
-cat > "/etc/erp/$PROJECT_NAME.conf" <<EOF
+echo "STEP 7: Creating Configuration File"
+cat <<EOF > /etc/odoo.conf
 [options]
-admin_passwd = $ADMIN_PASSWORD
+admin_passwd = admin
 db_host = False
 db_port = False
-db_user = $PROJECT_NAME
+db_user = odoo
 db_password = False
-addons_path = $ERP_ROOT/server/addons,$ERP_ROOT/custom_addons
-logfile = /var/log/$PROJECT_NAME/odoo.log
-proxy_mode = True
+addons_path = $OE_HOME/addons,$OE_HOME/custom_addons/custom_addons
+logfile = /var/log/odoo/odoo.log
+log_level = info
 workers = 2
-http_port = 8769
+limit_memory_soft = 640000000
+limit_memory_hard = 760000000
+limit_request = 8192
+limit_time_cpu = 60
+limit_time_real = 120
 EOF
 
-mkdir -p "/var/log/$PROJECT_NAME"
-touch "/var/log/$PROJECT_NAME/odoo.log"
-chown -R "$PROJECT_NAME":"$PROJECT_NAME" "/var/log/$PROJECT_NAME"
-
-# === Authbind for port 80 ===
-echo "🔓 Preparing authbind for port 80..."
-touch /etc/authbind/byport/80
-chmod 500 /etc/authbind/byport/80
-chown $PROJECT_NAME /etc/authbind/byport/80
-
-# === Run Init On Port 8769 ===
-echo "🚀 Initializing ERP database safely (port 8769)..."
-sudo -u "$PROJECT_NAME" "$ERP_ROOT/venv/bin/python3" "$ERP_ROOT/server/odoo-bin" \
-  -c "/etc/erp/$PROJECT_NAME.conf" -d "$PROJECT_NAME" -i base \
-  --without-demo=all --load-language=en_US --stop-after-init > /tmp/odoo_init.log 2>&1 || {
-  echo "❌ ERP init failed. Log output below:"
-  cat /tmp/odoo_init.log
-  exit 1
-}
-
-# === Update config for port 80 ===
-sed -i 's/http_port = 8769/http_port = 80/' "/etc/erp/$PROJECT_NAME.conf"
-
-# === systemd service ===
-echo "🔁 Creating systemd service..."
-cat > "/etc/systemd/system/$PROJECT_NAME.service" <<EOF
+echo "STEP 8: Creating Odoo Service"
+cat <<EOF > /etc/systemd/system/odoo.service
 [Unit]
-Description=$PROJECT_NAME ERP Service
+Description=Odoo
 After=network.target postgresql.service
-Requires=postgresql.service
 
 [Service]
 Type=simple
-User=$PROJECT_NAME
-Group=$PROJECT_NAME
-ExecStart=/usr/bin/authbind $ERP_ROOT/venv/bin/python3 $ERP_ROOT/server/odoo-bin -c /etc/erp/$PROJECT_NAME.conf
-Restart=on-failure
+SyslogIdentifier=odoo
+PermissionsStartOnly=true
+User=$OE_USER
+Group=$OE_USER
+ExecStart=$OE_HOME/venv/bin/python3 $OE_HOME/odoo-bin -c /etc/odoo.conf
+StandardOutput=journal+console
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+echo "STEP 9: Starting Odoo Service"
+systemctl daemon-reexec
 systemctl daemon-reload
-systemctl enable "$PROJECT_NAME"
-systemctl restart "$PROJECT_NAME"
+systemctl enable odoo
+systemctl start odoo
 
-sleep 3
-
-# === Final Curl Check ===
-echo "🌐 Verifying HTTP access on port 80..."
-if curl -s --head http://127.0.0.1 | grep -i '200 OK' > /dev/null; then
-  echo "✅ ERP is accessible on port 80."
-else
-  echo "❌ ERP failed to respond on port 80. Check logs: journalctl -u $PROJECT_NAME --no-pager"
-  exit 1
-fi
-
-# === Final Info ===
-echo -e "\n========================================="
-echo " 🎉 ERP $PROJECT_NAME installed and running 🎉"
-echo "========================================="
-echo " Access it via: http://$(hostname -I | awk '{print $1}')"
-echo " Default login: admin / $ADMIN_PASSWORD"
-echo "========================================="
+echo "✅ INSTALLATION COMPLETE"
+echo "Access your Odoo 18 via: http://<your-server-ip>:8069"
