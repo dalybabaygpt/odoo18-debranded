@@ -42,17 +42,26 @@ apt install -y postgresql
 # ========= CREATE USER =========
 echo -e "${GREEN}Creating system user and PostgreSQL user...${NC}"
 adduser --system --home=$ODOO_HOME --group $ODOO_USER || true
-su - postgres -c "psql -c \"DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \$\$;\""
+su - postgres -c "psql -c \"DO \\\$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \\\$\$;\""
 su - postgres -c "psql -c \"ALTER ROLE $ODOO_USER CREATEDB;\""
 
 # ========= INSTALL ODOO =========
 echo -e "${GREEN}Cloning Odoo source...${NC}"
-mkdir -p $CUSTOM_ADDONS_PATH
 cd /opt
 if [ ! -d "$ODOO_HOME/odoo" ]; then
   git clone https://www.github.com/odoo/odoo --depth 1 --branch $ODOO_VERSION --single-branch $ODOO_HOME/odoo
 fi
 
+# ========= CUSTOM ADDONS =========
+echo -e "${GREEN}Cloning custom addons...${NC}"
+if [ ! -d "$CUSTOM_ADDONS_PATH" ]; then
+  git clone https://github.com/dalybabaygpt/odoo18-debranded.git /opt/odoo/tmprepo
+  mv /opt/odoo/tmprepo/custom_addons $CUSTOM_ADDONS_PATH
+  rm -rf /opt/odoo/tmprepo
+  chown -R $ODOO_USER:$ODOO_USER $CUSTOM_ADDONS_PATH
+fi
+
+# ========= PYTHON VENV =========
 echo -e "${GREEN}Creating Python virtualenv...${NC}"
 cd $ODOO_HOME
 apt install -y python3-venv
