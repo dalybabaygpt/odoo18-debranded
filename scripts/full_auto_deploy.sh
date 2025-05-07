@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Odoo CE 18 Auto Installer for Ubuntu 24.04
-# Fully debranded + Custom addons path support + optional NGINX/SSL + real-time config
+# Fully debranded + Custom addons path support + optional NGINX/SSL + real-time config + domain prompt + email prompt + auto SSL renewal
 
 # ========= VARIABLES =========
 ODOO_VERSION=18.0
@@ -22,8 +22,17 @@ NC="\033[0m"
 echo -e "${GREEN}Starting Odoo CE 18 Installer for Ubuntu 24.04...${NC}"
 echo "Please enter a password for the PostgreSQL user '$ODOO_USER':"
 read -s POSTGRES_PASSWORD
+echo "Please enter a master admin password for Odoo (leave blank for default 'Time2fly@123'):"
+read -s ADMIN_PASSWORD
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-Time2fly@123}
 echo "Do you want to install NGINX + SSL + real-time connection support (y/n)?"
 read -r INSTALL_NGINX
+if [ "$INSTALL_NGINX" = "y" ]; then
+  echo "Enter your domain name (e.g. erp.example.com):"
+  read -r DOMAIN_NAME
+  echo "Enter your email for Let's Encrypt SSL registration (e.g. you@example.com):"
+  read -r CERTBOT_EMAIL
+fi
 
 # ========= SYSTEM UPDATE =========
 echo -e "${GREEN}Updating system...${NC}"
@@ -36,7 +45,7 @@ libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \
 node-less libjpeg-dev libpq-dev libxml2-dev zlib1g-dev libffi-dev \
 libssl-dev libyaml-dev libopenblas-dev liblcms2-dev libblas-dev \
 libatlas-base-dev libwebp-dev libtiff-dev libxrender1 xfonts-75dpi \
-xfonts-base libjpeg8-dev gdebi unzip net-tools curl
+xfonts-base libjpeg8-dev gdebi unzip net-tools curl software-properties-common
 
 # ========= POSTGRESQL =========
 echo -e "${GREEN}Installing PostgreSQL...${NC}"
@@ -45,7 +54,7 @@ apt install -y postgresql
 # ========= CREATE USER =========
 echo -e "${GREEN}Creating system user and PostgreSQL user...${NC}"
 adduser --system --home=$ODOO_HOME --group $ODOO_USER || true
-su - postgres -c "psql -c \"DO \\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \\\$\\\$;\""
+su - postgres -c "psql -c \"DO \\\$\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \\\$\\$;\""
 su - postgres -c "psql -c \"ALTER ROLE $ODOO_USER CREATEDB;\""
 
 # ========= INSTALL ODOO =========
@@ -79,7 +88,7 @@ mkdir -p /etc/odoo
 mkdir -p $LOG_PATH
 cat <<EOF > $ODOO_CONF
 [options]
-admin_passwd = Time2fly@123
+admin_passwd = $ADMIN_PASSWORD
 addons_path = $ODOO_HOME/odoo/addons,$CUSTOM_ADDONS_PATH
 db_host = False
 db_port = False
@@ -126,16 +135,12 @@ systemctl start odoo
 # ========= NGINX + SSL + REALTIME =========
 if [ "$INSTALL_NGINX" = "y" ]; then
   echo -e "${GREEN}Installing NGINX + enabling WebSocket real-time support...${NC}"
-  apt install -y nginx
-  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -subj "/C=TN/ST=Tunisia/L=Tunis/O=Tashyl/CN=localhost" \
-    -keyout /etc/ssl/private/odoo-selfsigned.key \
-    -out /etc/ssl/certs/odoo-selfsigned.crt
+  apt install -y nginx certbot python3-certbot-nginx
 
   cat <<EOF > $NGINX_CONF_PATH
 server {
     listen 80;
-    server_name _;
+    server_name $DOMAIN_NAME;
 
     location / {
         proxy_pass http://127.0.0.1:8069;
@@ -161,10 +166,16 @@ EOF
 
   ln -s $NGINX_CONF_PATH $NGINX_ENABLED_PATH
   nginx -t && systemctl restart nginx
+
+  echo -e "${GREEN}Obtaining Let's Encrypt SSL certificate...${NC}"
+  certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos -m $CERTBOT_EMAIL
+
+  echo -e "${GREEN}Setting up auto-renewal cron job...${NC}"
+  echo "0 3 * * * root certbot renew --quiet && systemctl reload nginx" > /etc/cron.d/odoo_cert_renew
 fi
 
 # ========= DONE =========
 echo -e "${GREEN}Odoo CE 18 installation complete.${NC}"
-echo "Access it via: http://your-server-ip:8069"
-echo "Database Master Password: Time2fly@123"
+echo "Access it via: http://$DOMAIN_NAME"
+echo "Database Master Password: $ADMIN_PASSWORD"
 echo "Custom Addons Folder: $CUSTOM_ADDONS_PATH"
