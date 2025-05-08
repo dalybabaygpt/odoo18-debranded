@@ -1,25 +1,22 @@
 #!/bin/bash
 
 # Script 2: NGINX + SSL + Real-time Fix for Odoo CE 18
-# Prompts for domain/email, enables WebSocket, real-time, and Let's Encrypt SSL with Cloudflare support
+# Automatically enables Let's Encrypt SSL, Cloudflare support, and real-time for any domain
 
-# ========= PROMPT =========
 echo -e "\033[1;32mStarting Script 2: Enable SSL and Real-Time...\033[0m"
-echo "Enter your domain (e.g. erp.example.com):"
-read -r DOMAIN
-echo "Enter your email for Let's Encrypt registration:"
-read -r EMAIL
+read -p "Enter your domain (e.g. erp.example.com): " DOMAIN
+read -p "Enter your email for Let's Encrypt registration: " EMAIL
 
-# ========= CERTBOT INSTALL =========
+# ========= DEPENDENCIES =========
 echo -e "\033[1;32mInstalling Certbot & NGINX modules...\033[0m"
-apt install -y certbot python3-certbot-nginx nginx
+apt update && apt install -y certbot python3-certbot-nginx nginx
 
 # ========= FIREWALL =========
 echo -e "\033[1;32mEnsuring ports 80/443 are open...\033[0m"
 ufw allow 80,443/tcp || true
 ufw reload || true
 
-# ========= CLOUDFLARE IPS =========
+# ========= CLOUDFLARE SUPPORT =========
 echo -e "\033[1;32mAllowing Cloudflare IP ranges...\033[0m"
 for ip in $(curl -s https://www.cloudflare.com/ips-v4); do
   ufw allow from $ip to any port 443 proto tcp || true
@@ -27,8 +24,46 @@ for ip in $(curl -s https://www.cloudflare.com/ips-v4); do
 done
 ufw reload || true
 
-# ========= NGINX CONFIG =========
-echo -e "\033[1;32mCreating NGINX config for $DOMAIN...\033[0m"
+# ========= TEMP HTTP NGINX BLOCK (for certbot to work) =========
+echo -e "\033[1;32mCreating temporary HTTP-only NGINX config for $DOMAIN...\033[0m"
+cat <<EOF > /etc/nginx/sites-available/odoo
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location / {
+        proxy_pass http://127.0.0.1:8069;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/odoo
+nginx -t && systemctl restart nginx
+
+# ========= GET SSL CERTIFICATE =========
+echo -e "\033[1;32mRequesting Let's Encrypt certificate for $DOMAIN...\033[0m"
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
+
+# ========= GET REQUIRED SSL FILES =========
+echo -e "\033[1;32mFetching missing Certbot SSL config files if needed...\033[0m"
+mkdir -p /etc/letsencrypt
+if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
+  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf -o /etc/letsencrypt/options-ssl-nginx.conf
+fi
+
+if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
+  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem -o /etc/letsencrypt/ssl-dhparams.pem
+fi
+
+# ========= FINAL FULL SSL NGINX CONFIG =========
+echo -e "\033[1;32mCreating full HTTPS + WebSocket NGINX config...\033[0m"
 cat <<EOF > /etc/nginx/sites-available/odoo
 map \$http_upgrade \$connection_upgrade {
     default upgrade;
@@ -110,15 +145,10 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/odoo
-nginx -t && systemctl reload nginx
+nginx -t && systemctl restart nginx
 
-# ========= SSL VIA CERTBOT =========
-echo -e "\033[1;32mRequesting SSL certificate via Certbot...\033[0m"
-certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL || true
-
-# ========= ENABLE ODOO CONF REAL-TIME =========
-echo -e "\033[1;32mEnabling proxy_mode, longpolling and workers in /etc/odoo/odoo.conf...\033[0m"
+# ========= ENABLE ODOO CONFIGS =========
+echo -e "\033[1;32mEnabling proxy_mode, longpolling, and workers in /etc/odoo/odoo.conf...\033[0m"
 sed -i '/^proxy_mode/d' /etc/odoo/odoo.conf
 sed -i '/^workers/d' /etc/odoo/odoo.conf
 sed -i '/^gevent_port/d' /etc/odoo/odoo.conf
@@ -126,11 +156,11 @@ echo "proxy_mode = True" >> /etc/odoo/odoo.conf
 echo "workers = 3" >> /etc/odoo/odoo.conf
 echo "gevent_port = 8072" >> /etc/odoo/odoo.conf
 
-# ========= RESTART SERVICES =========
-echo -e "\033[1;32mRestarting Odoo and NGINX...\033[0m"
+# ========= RESTART ODOO =========
+echo -e "\033[1;32mRestarting Odoo and verifying ports...\033[0m"
 systemctl restart odoo
-systemctl restart nginx
+ss -tuln | grep -E '8069|8072'
 
-# ========= VERIFY =========
-echo -e "\033[1;32m✅ All set. You can now access: https://$DOMAIN\033[0m"
-echo -e "Real-time should be working. Check browser dev tools for WebSocket on /longpolling."
+echo -e "\n✅ Installation finished!"
+echo -e "→ Access your ERP at: https://$DOMAIN"
+echo -e "→ Real-time features (WebSocket) are enabled.\n"
