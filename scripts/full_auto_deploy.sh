@@ -1,202 +1,166 @@
 #!/bin/bash
 
-# Odoo CE 18 Auto Installer for Ubuntu 24.04
-# Fully debranded + Custom addons path support + optional NGINX/SSL + real-time config + domain prompt + email prompt + auto SSL renewal
+# Script 2: NGINX + SSL + Real-time Fix for Odoo CE 18
+# Automatically enables Let's Encrypt SSL, Cloudflare support, and real-time for any domain
 
-# ========= VARIABLES =========
-ODOO_VERSION=18.0
-ODOO_USER=odoo
-ODOO_HOME=/opt/odoo
-ODOO_CONF=/etc/odoo/odoo.conf
-CUSTOM_ADDONS_PATH="$ODOO_HOME/custom_addons"
-ODOO_SERVICE_FILE=/etc/systemd/system/odoo.service
-LOG_PATH=/var/log/odoo
-NGINX_CONF_PATH=/etc/nginx/sites-available/odoo
-NGINX_ENABLED_PATH=/etc/nginx/sites-enabled/odoo
-
-# ========= COLORS =========
-GREEN="\033[1;32m"
-NC="\033[0m"
-
-# ========= PROMPT =========
-echo -e "${GREEN}Starting Odoo CE 18 Installer for Ubuntu 24.04...${NC}"
-echo "Please enter a password for the PostgreSQL user '$ODOO_USER':"
-read -s POSTGRES_PASSWORD
-echo "Please enter a master admin password for Odoo (leave blank for default 'Time2fly@123'):"
-read -s ADMIN_PASSWORD
-ADMIN_PASSWORD=${ADMIN_PASSWORD:-Time2fly@123}
-echo "Do you want to install NGINX + SSL + real-time connection support (y/n)?"
-read -r INSTALL_NGINX
-if [ "$INSTALL_NGINX" = "y" ]; then
-  echo "Enter your domain name (e.g. erp.example.com):"
-  read -r DOMAIN_NAME
-  echo "Enter your email for Let's Encrypt SSL registration (e.g. you@example.com):"
-  read -r CERTBOT_EMAIL
-
-  echo -e "${GREEN}Checking if domain resolves...${NC}"
-  if ! ping -c 1 -W 2 "$DOMAIN_NAME" >/dev/null 2>&1; then
-    echo -e "\033[1;31m[ERROR] Domain $DOMAIN_NAME is not resolving!\033[0m"
-    echo "Ensure your domain points to this server's IP before running the installer."
-    exit 1
-  fi
-fi
-
-# ========= SYSTEM UPDATE =========
-echo -e "${GREEN}Updating system...${NC}"
-apt update && apt upgrade -y
+echo -e "\033[1;32mStarting Script 2: Enable SSL and Real-Time...\033[0m"
+read -p "Enter your domain (e.g. erp.example.com): " DOMAIN
+read -p "Enter your email for Let's Encrypt registration: " EMAIL
 
 # ========= DEPENDENCIES =========
-echo -e "${GREEN}Installing dependencies...${NC}"
-apt install -y git python3-pip build-essential wget python3-dev python3-venv \
-libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools \
-node-less libjpeg-dev libpq-dev libxml2-dev zlib1g-dev libffi-dev \
-libssl-dev libyaml-dev libopenblas-dev liblcms2-dev libblas-dev \
-libatlas-base-dev libwebp-dev libtiff-dev libxrender1 xfonts-75dpi \
-xfonts-base libjpeg8-dev gdebi unzip net-tools curl software-properties-common
+echo -e "\033[1;32mInstalling Certbot & NGINX modules...\033[0m"
+apt update && apt install -y certbot python3-certbot-nginx nginx
 
-# ========= POSTGRESQL =========
-echo -e "${GREEN}Installing PostgreSQL...${NC}"
-apt install -y postgresql
+# ========= FIREWALL =========
+echo -e "\033[1;32mEnsuring ports 80/443 are open...\033[0m"
+ufw allow 80,443/tcp || true
+ufw reload || true
 
-# ========= CREATE USER =========
-echo -e "${GREEN}Creating system user and PostgreSQL user...${NC}"
-adduser --system --home=$ODOO_HOME --group $ODOO_USER || true
-su - postgres -c "psql -c \"DO \\\$\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$ODOO_USER') THEN CREATE ROLE $ODOO_USER WITH LOGIN PASSWORD '$POSTGRES_PASSWORD'; END IF; END \\\$\\$;\""
-su - postgres -c "psql -c \"ALTER ROLE $ODOO_USER CREATEDB;\""
+# ========= CLOUDFLARE SUPPORT =========
+echo -e "\033[1;32mAllowing Cloudflare IP ranges...\033[0m"
+for ip in $(curl -s https://www.cloudflare.com/ips-v4); do
+  ufw allow from $ip to any port 443 proto tcp || true
+  ufw allow from $ip to any port 80 proto tcp || true
+done
+ufw reload || true
 
-# ========= INSTALL ODOO =========
-echo -e "${GREEN}Cloning Odoo source...${NC}"
-cd /opt
-if [ ! -d "$ODOO_HOME/odoo" ]; then
-  git clone https://www.github.com/odoo/odoo --depth 1 --branch $ODOO_VERSION --single-branch $ODOO_HOME/odoo
-fi
-
-# ========= CUSTOM ADDONS =========
-echo -e "${GREEN}Cloning custom addons...${NC}"
-if [ ! -d "$CUSTOM_ADDONS_PATH" ]; then
-  git clone https://github.com/dalybabaygpt/odoo18-debranded.git /opt/odoo/tmprepo
-  mv /opt/odoo/tmprepo/custom_addons $CUSTOM_ADDONS_PATH
-  rm -rf /opt/odoo/tmprepo
-  chown -R $ODOO_USER:$ODOO_USER $CUSTOM_ADDONS_PATH
-fi
-
-# ========= PYTHON VENV =========
-echo -e "${GREEN}Creating Python virtualenv...${NC}"
-cd $ODOO_HOME
-apt install -y python3-venv
-python3 -m venv venv
-source venv/bin/activate
-pip3 install wheel
-pip3 install -r odoo/requirements.txt
-
-# ========= CONFIG FILE =========
-echo -e "${GREEN}Creating config file...${NC}"
-mkdir -p /etc/odoo
-mkdir -p $LOG_PATH
-cat <<EOF > $ODOO_CONF
-[options]
-admin_passwd = $ADMIN_PASSWORD
-addons_path = $ODOO_HOME/odoo/addons,$CUSTOM_ADDONS_PATH
-db_host = False
-db_port = False
-db_user = $ODOO_USER
-db_password = $POSTGRES_PASSWORD
-logfile = $LOG_PATH/odoo.log
-logrotate = True
-log_level = info
-xmlrpc_port = 8069
-proxy_mode = True
-longpolling_port = 8072
-EOF
-
-chown $ODOO_USER:$ODOO_USER $ODOO_CONF
-chmod 640 $ODOO_CONF
-
-# ========= SYSTEMD SERVICE =========
-echo -e "${GREEN}Creating systemd service...${NC}"
-cat <<EOF > $ODOO_SERVICE_FILE
-[Unit]
-Description=Odoo
-Requires=postgresql.service
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-SyslogIdentifier=odoo
-PermissionsStartOnly=true
-User=$ODOO_USER
-Group=$ODOO_USER
-ExecStart=$ODOO_HOME/venv/bin/python3 $ODOO_HOME/odoo/odoo-bin -c $ODOO_CONF
-StandardOutput=journal+console
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-chmod 644 $ODOO_SERVICE_FILE
-systemctl daemon-reexec
-systemctl daemon-reload
-systemctl enable odoo
-systemctl start odoo
-
-# ========= NGINX + SSL + REALTIME =========
-if [ "$INSTALL_NGINX" = "y" ]; then
-  echo -e "${GREEN}Installing NGINX + enabling WebSocket real-time support...${NC}"
-  apt install -y nginx certbot python3-certbot-nginx
-
-  cat <<EOF > $NGINX_CONF_PATH
+# ========= TEMP HTTP NGINX BLOCK (for certbot to work) =========
+echo -e "\033[1;32mCreating temporary HTTP-only NGINX config for $DOMAIN...\033[0m"
+cat <<EOF > /etc/nginx/sites-available/odoo
 server {
     listen 80;
-    server_name $DOMAIN_NAME;
+    server_name $DOMAIN;
 
     location / {
         proxy_pass http://127.0.0.1:8069;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
     }
-
-    location /longpolling/ {
-        proxy_pass http://127.0.0.1:8072/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    error_log  /var/log/nginx/odoo_error.log;
-    access_log /var/log/nginx/odoo_access.log;
 }
 EOF
 
-  ln -s $NGINX_CONF_PATH $NGINX_ENABLED_PATH
-  nginx -t && systemctl restart nginx
+ln -sf /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/odoo
+nginx -t && systemctl restart nginx
 
-  echo -e "${GREEN}Obtaining Let's Encrypt SSL certificate...${NC}"
-  if certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos -m $CERTBOT_EMAIL; then
-    echo -e "${GREEN}SSL certificate successfully installed.${NC}"
-  else
-    echo -e "\033[1;31m[ERROR] SSL certificate installation failed!\033[0m"
-    echo -e "Please ensure:"
-    echo -e "- Your domain ($DOMAIN_NAME) is pointing to this server IP"
-    echo -e "- Port 80/443 are open"
-    echo -e "- Cloudflare (if used) is set to 'Full' or 'Strict' mode, not 'Flexible'"
-    echo -e "You can rerun: certbot --nginx -d $DOMAIN_NAME -m $CERTBOT_EMAIL"
-    echo -e "Proceeding without valid SSL..."
-  fi
+# ========= GET SSL CERTIFICATE =========
+echo -e "\033[1;32mRequesting Let's Encrypt certificate for $DOMAIN...\033[0m"
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
-  echo -e "${GREEN}Setting up auto-renewal cron job...${NC}"
-  echo "0 3 * * * root certbot renew --quiet && systemctl reload nginx" > /etc/cron.d/odoo_cert_renew
+# ========= GET REQUIRED SSL FILES =========
+echo -e "\033[1;32mFetching missing Certbot SSL config files if needed...\033[0m"
+mkdir -p /etc/letsencrypt
+if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
+  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf -o /etc/letsencrypt/options-ssl-nginx.conf
 fi
 
-# ========= DONE =========
-echo -e "${GREEN}Odoo CE 18 installation complete.${NC}"
-if [ "$INSTALL_NGINX" = "y" ]; then
-  echo "Access it via: https://$DOMAIN_NAME"
-else
-  echo "Access it via: http://your-server-ip:8069"
+if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
+  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem -o /etc/letsencrypt/ssl-dhparams.pem
 fi
-echo "Database Master Password: $ADMIN_PASSWORD"
-echo "Custom Addons Folder: $CUSTOM_ADDONS_PATH"
+
+# ========= FINAL FULL SSL NGINX CONFIG =========
+echo -e "\033[1;32mCreating full HTTPS + WebSocket NGINX config...\033[0m"
+cat <<EOF > /etc/nginx/sites-available/odoo
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log /var/log/nginx/odoo_access.log;
+    error_log /var/log/nginx/odoo_error.log;
+
+    proxy_read_timeout 900;
+    proxy_connect_timeout 900;
+    proxy_send_timeout 900;
+    send_timeout 900;
+    client_max_body_size 200M;
+
+    gzip on;
+    gzip_types text/css text/scss application/javascript application/json image/svg+xml;
+    gzip_min_length 256;
+
+    location ~* /web/static/ {
+        proxy_cache_valid 200 90m;
+        proxy_buffering on;
+        expires 864000;
+        proxy_pass http://127.0.0.1:8069;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8069;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_buffering off;
+    }
+
+    location /longpolling {
+        proxy_pass http://127.0.0.1:8072;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    location /websocket {
+        proxy_pass http://127.0.0.1:8072;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_buffering off;
+    }
+}
+EOF
+
+nginx -t && systemctl restart nginx
+
+# ========= ENABLE ODOO CONFIGS =========
+echo -e "\033[1;32mEnabling proxy_mode, longpolling, and workers in /etc/odoo/odoo.conf...\033[0m"
+sed -i '/^proxy_mode/d' /etc/odoo/odoo.conf
+sed -i '/^workers/d' /etc/odoo/odoo.conf
+sed -i '/^gevent_port/d' /etc/odoo/odoo.conf
+echo "proxy_mode = True" >> /etc/odoo/odoo.conf
+echo "workers = 3" >> /etc/odoo/odoo.conf
+echo "gevent_port = 8072" >> /etc/odoo/odoo.conf
+
+# ========= RESTART ODOO =========
+echo -e "\033[1;32mRestarting Odoo and verifying ports...\033[0m"
+systemctl restart odoo
+ss -tuln | grep -E '8069|8072'
+
+echo -e "\n✅ Installation finished!"
+echo -e "→ Access your ERP at: https://$DOMAIN"
+echo -e "→ Real-time features (WebSocket) are enabled.\n"
