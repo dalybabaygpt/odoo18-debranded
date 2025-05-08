@@ -1,4 +1,4 @@
-# ⚙️ Odoo CE 18 – Full Automated Installer (Debranded, SSL, Real-Time Ready)
+# ⚙️ ERP CE 18 – Full Automated Installer (Debranded, SSL, Real-Time Ready)
 
 This repo provides a **3-script setup** to launch a production-ready Odoo CE 18 on any Ubuntu 22.04+ or 24.04 server.
 
@@ -21,7 +21,7 @@ All scripts are fully debranded, use your custom modules, support Cloudflare DNS
 
 **Run it:**
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/odoo18-debranded/main/scripts/install_ip18.sh)
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/install_ip18.sh)
 2️⃣ create_SSL.sh — Add HTTPS + Real-Time Fix
 Use case: When your domain is ready and pointing to the server. This script configures:
 
@@ -46,7 +46,7 @@ Run it:
 bash
 Copy
 Edit
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/odoo18-debranded/main/scripts/create_SSL.sh)
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/create_SSL.sh)
 3️⃣ install_full.sh — One-Click Install for Domain-Based Setup
 Use case: When starting from scratch with a domain already ready (DNS set).
 
@@ -67,7 +67,7 @@ Run it:
 bash
 Copy
 Edit
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/odoo18-debranded/main/scripts/install_full.sh)
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/install_full.sh)
 ✅ Requirements
 Ubuntu 22.04 or 24.04 (fresh VPS)
 
