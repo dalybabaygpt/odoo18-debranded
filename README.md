@@ -1,4 +1,4 @@
-# ⚙️ ERP CE 18 – Full Automated Installer (Debranded, SSL, Real-Time Ready)
+# ⚙️ Odoo CE 18 – Full Automated Installer (Debranded, SSL, Real-Time Ready)
 
 This repo provides a **3-script setup** to launch a production-ready Odoo CE 18 on any Ubuntu 22.04+ or 24.04 server.
 
@@ -21,119 +21,117 @@ All scripts are fully debranded, use your custom modules, support Cloudflare DNS
 
 **Run it:**
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/install_ip18.sh)
-2️⃣ create_SSL.sh — Add HTTPS + Real-Time Fix
-Use case: When your domain is ready and pointing to the server. This script configures:
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/main/scripts/install_ip18.sh)
+```
 
-NGINX reverse proxy
+---
 
-Let's Encrypt SSL with Certbot
+### 2️⃣ `create_SSL.sh` — Add HTTPS + Real-Time Fix
 
-Cloudflare IP whitelisting
+**Use case:** When your domain is ready and pointing to the server. This script configures:
+- NGINX reverse proxy
+- Let's Encrypt SSL with Certbot
+- Cloudflare IP whitelisting
+- WebSocket `/longpolling` for real-time
+- Odoo config fix (`proxy_mode`, `workers`, `gevent_port`)
 
-WebSocket /longpolling for real-time
+**Prompts:**
+- Your domain (e.g., `erp.example.com`)
+- Your email (for SSL cert)
 
-Odoo config fix (proxy_mode, workers, gevent_port)
+**Run it:**
+```bash
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/main/scripts/create_SSL.sh)
+```
 
-Prompts:
+---
 
-Your domain (e.g., erp.example.com)
+### 3️⃣ `install_full.sh` — One-Click Install for Domain-Based Setup
 
-Your email (for SSL cert)
+**Use case:** When starting from scratch with a domain already ready (DNS set).
 
-Run it:
+**Combines:**
+- Odoo CE 18 base install (`install_ip18.sh`)
+- SSL + Real-time config (`create_SSL.sh`)
 
-bash
-Copy
-Edit
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/create_SSL.sh)
-3️⃣ install_full.sh — One-Click Install for Domain-Based Setup
-Use case: When starting from scratch with a domain already ready (DNS set).
+**Prompts:**
+- Your domain
+- Your email
 
-Combines:
+**Run it:**
+```bash
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/main/scripts/install_full.sh)
+```
 
-Odoo CE 18 base install (install_ip18.sh)
+---
 
-SSL + Real-time config (create_SSL.sh)
+## ✅ Requirements
 
-Prompts:
+- Ubuntu 22.04 or 24.04 (fresh VPS)
+- Root SSH access
+- Domain pointing to the server IP (if using Script 2 or 3)
+- Port 80/443 open
+- Cloudflare DNS (recommended)
 
-Your domain
+---
 
-Your email
+## 🛠️ What's Included
 
-Run it:
+| Feature                          | Supported? |
+|----------------------------------|------------|
+| Odoo 18 CE (latest build)        | ✅         |
+| Python virtualenv                | ✅         |
+| Custom addons loader             | ✅         |
+| WebSocket real-time support      | ✅         |
+| Cloudflare WebSocket passthrough | ✅         |
+| SSL via Let's Encrypt            | ✅         |
+| NGINX reverse proxy              | ✅         |
+| Longpolling & gevent fix         | ✅         |
+| Debranded install                | ✅         |
 
-bash
-Copy
-Edit
-bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/erp18-debranded/main/scripts/install_full.sh)
-✅ Requirements
-Ubuntu 22.04 or 24.04 (fresh VPS)
+---
 
-Root SSH access
+## 🧠 Tips & Troubleshooting
 
-Domain pointing to the server IP (if using Script 2 or 3)
-
-Port 80/443 open
-
-Cloudflare DNS (recommended)
-
-🛠️ What's Included
-Feature	Supported?
-Odoo 18 CE (latest build)	✅
-Python virtualenv	✅
-Custom addons loader	✅
-WebSocket real-time support	✅
-Cloudflare WebSocket passthrough	✅
-SSL via Let's Encrypt	✅
-NGINX reverse proxy	✅
-Longpolling & gevent fix	✅
-Debranded install	✅
-
-🧠 Tips & Troubleshooting
-Check https://yourdomain.com/websocket or /longpolling in browser dev tools to confirm real-time is working.
-
-Run ss -tuln | grep 8072 to verify gevent is active.
-
-If NGINX fails, run:
-
-bash
-Copy
-Edit
+- Check `https://yourdomain.com/websocket` or `/longpolling` in browser dev tools to confirm real-time is working.
+- Run `ss -tuln | grep 8072` to verify gevent is active.
+- If NGINX fails, run:
+```bash
 nginx -t
 journalctl -xeu nginx.service
-For SSL issues, make sure DNS is pointed correctly, and rerun:
-
-bash
-Copy
-Edit
+```
+- For SSL issues, make sure DNS is pointed correctly, and rerun:
+```bash
 certbot --nginx -d yourdomain.com --non-interactive --agree-tos -m you@example.com
-📂 Directory Structure
-bash
-Copy
-Edit
+```
+
+---
+
+## 📂 Directory Structure
+
+```
 scripts/
 ├── install_ip18.sh        # Script 1
 ├── create_SSL.sh          # Script 2
 └── install_full.sh        # Script 3 (Combo)
 custom_addons/
 └── your modules here...
-🤝 Contribute
-You’re welcome to fork, adapt, or report issues. Pull requests are reviewed quickly.
-
-🚀 Author
-Created and maintained by @dalybabaygpt for high-speed ERP deployment & automation.
-
-📘 License
-MIT License – Free for commercial and personal use.
-
-yaml
-Copy
-Edit
+```
 
 ---
 
-You can now name the file exactly `README.md` and add it in the root of your repo (`odoo18-debranded/`), so it appears automatically on GitHub’s home screen for the project.
+## 🤝 Contribute
 
-Want me to push the file directly via a PR or just help you upload it?
+You’re welcome to fork, adapt, or report issues. Pull requests are reviewed quickly.
+
+---
+
+## 🚀 Author
+
+Created and maintained by [@dalybabaygpt](https://github.com/dalybabaygpt) for high-speed ERP deployment & automation.
+
+---
+
+## 📘 License
+
+MIT License – Free for commercial and personal use.
