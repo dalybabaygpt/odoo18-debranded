@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <!-- Extend web.UserMenu -->
+  <t t-inherit="web.UserMenu" t-inherit-mode="extension" owl="1">
+    <xpath expr="//button" position="replace">
+        <img class="o_avatar o_user_avatar rounded" t-att-src="source" alt="User"/>
+    </xpath>
+  </t>
+
+  <!-- Custom SidebarBottom for Systray -->
+  <t t-name="SidebarBottom" owl="1">
+    <div class="systray-container-bits">
+        <div class="o_user_menu pe-0 dropdown p-1">
+            <div class="user-avtar-bits d-block py-1 px-1 rounded" style="background-color:#343434" data-bs-toggle="dropdown" aria-expanded="false">
+                <div class="d-flex align-items-center">
+                    <img class="o_avatar o_user_avatar rounded-circle px-1 py-1" style="height:20%; width:20%" t-att-src="source || '/web/static/img/user_menu_avatar.png'" t-att-alt="user?.name || 'User'"/>
+                    <span class="oe_topbar_name ms-2 lh-1 text-truncate mb-0 py-2 text-white d-block">
+                        <t t-esc="user?.name || 'Unknown User'"/>
+                    </span>
+                </div>
+                <div class="oe_topbar_name text-start smaller py-1 lh-1 text-truncate w-100" t-att-class="{'d-lg-inline-block' : env.debug}">
+                    <mark class="d-block font-monospace text-truncate text-black p-2" style="background-color:white; border-radius:5px">
+                        <i class="fa fa-database oi-small me-1"/><t t-esc="dbName || 'No Database'"/>
+                    </mark>
+                </div>
+                <div class="powered-by text-white">
+                    Powered By <a href="https://www.terabits.xyz/contact-us" class="btn btn-link btn-sm" style="color:#007aff">Terabits Technolab</a>
+                </div>
+            </div>
+            <div class="dropdown-menu systray-dropdown-menu w-100">
+                <t t-foreach="getElements()" t-as="element" t-key="element_index">
+                    <t t-if="!element.hide">
+                        <DropdownItem
+                            t-if="element.type == 'item' || element.type == 'switch'"
+                        >
+                            <a t-att-href="element.href" t-att-data-menu="element.id" class="dropdown-item-content" t-on-click="element.callback">
+                                <CheckBox
+                                    t-if="element.type == 'switch'"
+                                    value="element.isChecked"
+                                    className="'form-switch d-flex flex-row-reverse justify-content-between p-0 w-100'"
+                                    onChange="element.callback"
+                                >
+                                    <t t-out="element.description"/>
+                                </CheckBox>
+                                <t t-else="" t-out="element.description"/>
+                            </a>
+                        </DropdownItem>
+                        <div t-if="element.type == 'separator'" role="separator" class="dropdown-divider"/>
+                    </t>
+                </t>
+            </div>
+        </div>
+    </div>
+    
+</t>
+  <t t-inherit="web.SwitchCompanyMenu" t-inherit-mode="extension" owl="1">
+    <xpath expr="//button" position="replace">
+      <button t-att-disabled="isSingleCompany" t-att-title="companyService.currentCompany.name">
+        <i class="fa fa-building" title="Switch Company"/>
+      </button>
+    </xpath>
+  </t>
+</templates>

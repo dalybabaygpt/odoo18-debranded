@@ -1,7 +1,0 @@
-<odoo>
-  <template id="remove_pos_logo_assets" inherit_id="point_of_sale.assets">
-    <xpath expr="." position="inside">
-      <link rel="stylesheet" href="/pos_remove_logo/static/src/css/hide_pos_logo.css"/>
-    </xpath>
-  </template>
-</odoo>
