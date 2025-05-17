@@ -1,0 +1,13 @@
+<odoo>
+    <!-- Replace browser tab title with ERP POS -->
+    <template id="point_of_sale.index" inherit_id="point_of_sale.index">
+        <xpath expr="//title" position="replace">
+            <title>ERP POS</title>
+        </xpath>
+    </template>
+
+    <!-- Remove Odoo logo in POS header -->
+    <template id="remove_odoo_pos_logo" inherit_id="point_of_sale.chrome">
+        <xpath expr="//img[contains(@class, 'pos-logo')]" position="replace"/>
+    </template>
+</odoo>
