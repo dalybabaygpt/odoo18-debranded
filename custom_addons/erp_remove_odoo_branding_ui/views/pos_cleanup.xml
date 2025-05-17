@@ -1,6 +1,6 @@
 <odoo>
     <!-- Replace browser tab title with ERP POS -->
-    <template id="point_of_sale.index" inherit_id="point_of_sale.index">
+    <template id="override_pos_title" inherit_id="point_of_sale.index">
         <xpath expr="//title" position="replace">
             <title>ERP POS</title>
         </xpath>

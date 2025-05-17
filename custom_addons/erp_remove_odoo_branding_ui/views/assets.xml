@@ -1,0 +1,7 @@
+<odoo>
+    <template id="override_pos_title" inherit_id="point_of_sale.index">
+        <xpath expr="//title" position="replace">
+            <title>ERP POS</title>
+        </xpath>
+    </template>
+</odoo>
