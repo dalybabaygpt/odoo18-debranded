@@ -1,4 +1,10 @@
 <odoo>
+    <template id="point_of_sale.index" inherit_id="point_of_sale.index" name="Override POS Title">
+        <xpath expr="//title" position="replace">
+            <title>ERP POS</title>
+        </xpath>
+    </template>
+
     <template id="remove_odoo_pos_logo" inherit_id="point_of_sale.chrome" name="Remove POS Logo">
         <xpath expr="//img[contains(@class, 'pos-logo')]" position="replace"/>
     </template>
