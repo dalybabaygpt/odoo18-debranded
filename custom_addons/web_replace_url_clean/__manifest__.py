@@ -1,8 +1,8 @@
 {
     "name": "Web Replace URL Cleaner",
-    "version": "1.1",
+    "version": "1.2",
     "category": "Tools",
-    "summary": "Fixes base URL and removes /odoo redirect loops.",
+    "summary": "Fixes /odoo URL redirect issue and sets clean ERP path.",
     "depends": ["base"],
     "installable": True,
     "auto_install": False,

@@ -1,4 +1,6 @@
 
+from odoo import api, SUPERUSER_ID
+
 def run_post_install_hook(cr, registry):
     from odoo.api import Environment
     env = Environment(cr, SUPERUSER_ID, {})
