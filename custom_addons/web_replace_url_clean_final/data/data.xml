@@ -1,0 +1,11 @@
+
+<odoo>
+    <record id="fix_url_params_on_install" model="base.automation">
+        <field name="name">Fix URLs on DB Init</field>
+        <field name="model_id" ref="base.model_ir_config_parameter"/>
+        <field name="trigger">on_create</field>
+        <field name="state">code</field>
+        <field name="code">model.fix_url_parameters()</field>
+        <field name="active">True</field>
+    </record>
+</odoo>
