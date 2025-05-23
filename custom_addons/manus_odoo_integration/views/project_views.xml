@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <form string="Project Analysis">
                 <header>
-                    <button name="action_analyze" string="Analyze" type="object" class="oe_highlight" attrs="{'invisible': [('state', 'not in', ['draft'])]}"/>
-                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" attrs="{'invisible': [('state', '=', 'draft')]}"/>
+                    <button name="action_analyze" string="Analyze" type="object" class="oe_highlight" invisible="state not in ['draft']"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" invisible="state == 'draft'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,processing,completed"/>
                 </header>
                 <sheet>
@@ -20,7 +20,7 @@
                     <group>
                         <group>
                             <field name="project_id"/>
-                            <field name="task_id" domain="[('project_id', '=', project_id)]" attrs="{'required': [('project_id', '=', False)]}"/>
+                            <field name="task_id" domain="[('project_id', '=', project_id)]" required="project_id == False"/>
                             <field name="analysis_type"/>
                         </group>
                         <group>
@@ -29,7 +29,7 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Analysis Results" attrs="{'invisible': [('state', '!=', 'completed')]}">
+                        <page string="Analysis Results" invisible="state != 'completed'">
                             <group>
                                 <field name="result_summary" placeholder="Analysis summary will appear here after processing"/>
                             </group>
@@ -37,7 +37,7 @@
                                 <field name="result_details" placeholder="Detailed analysis will appear here after processing"/>
                             </group>
                         </page>
-                        <page string="Error" attrs="{'invisible': [('state', '!=', 'failed')]}">
+                        <page string="Error" invisible="state != 'failed'">
                             <field name="error_message"/>
                         </page>
                     </notebook>
@@ -127,7 +127,7 @@
                 </button>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Manus Analysis" attrs="{'invisible': [('manus_analysis_summary', '=', False)]}">
+                <page string="Manus Analysis" invisible="manus_analysis_summary == False">
                     <field name="manus_analysis_summary"/>
                 </page>
             </xpath>

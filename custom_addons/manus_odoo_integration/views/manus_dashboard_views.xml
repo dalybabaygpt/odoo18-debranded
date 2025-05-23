@@ -101,7 +101,7 @@
                 <header>
                     <button name="test_connection" string="Test Connection" type="object" class="oe_highlight"/>
                     <button name="set_to_production" string="Set to Production" type="object" 
-                            attrs="{'invisible': ['|', ('state', '!=', 'test'), ('connection_status', '!=', 'success')]}"/>
+                            invisible="state != 'test' or connection_status != 'success'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,test,production"/>
                 </header>
                 <sheet>
@@ -119,7 +119,7 @@
                         <group>
                             <field name="last_connection"/>
                             <field name="connection_status"/>
-                            <field name="error_message" attrs="{'invisible': [('connection_status', '!=', 'failed')]}"/>
+                            <field name="error_message" invisible="connection_status != 'failed'"/>
                         </group>
                     </group>
                     <notebook>

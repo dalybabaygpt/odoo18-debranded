@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <form string="CRM Analysis">
                 <header>
-                    <button name="action_analyze" string="Analyze" type="object" class="oe_highlight" attrs="{'invisible': [('state', 'not in', ['draft'])]}"/>
-                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" attrs="{'invisible': [('state', '=', 'draft')]}"/>
+                    <button name="action_analyze" string="Analyze" type="object" class="oe_highlight" invisible="state not in ['draft']"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" invisible="state == 'draft'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,processing,completed"/>
                 </header>
                 <sheet>
@@ -26,11 +26,11 @@
                         <group>
                             <field name="user_id"/>
                             <field name="company_id" groups="base.group_multi_company"/>
-                            <field name="result_score" attrs="{'invisible': [('state', '!=', 'completed')]}" widget="percentpie"/>
+                            <field name="result_score" invisible="state != 'completed'" widget="percentpie"/>
                         </group>
                     </group>
                     <notebook>
-                        <page string="Analysis Results" attrs="{'invisible': [('state', '!=', 'completed')]}">
+                        <page string="Analysis Results" invisible="state != 'completed'">
                             <group>
                                 <field name="result_summary" placeholder="Analysis summary will appear here after processing"/>
                             </group>
@@ -38,7 +38,7 @@
                                 <field name="result_details" placeholder="Detailed analysis will appear here after processing"/>
                             </group>
                         </page>
-                        <page string="Error" attrs="{'invisible': [('state', '!=', 'failed')]}">
+                        <page string="Error" invisible="state != 'failed'">
                             <field name="error_message"/>
                         </page>
                     </notebook>
@@ -116,7 +116,7 @@
         <field name="inherit_id" ref="crm.crm_lead_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
-                <button name="action_analyze_with_manus" type="object" class="oe_stat_button" icon="fa-brain" attrs="{'invisible': [('type', 'not in', ['lead', 'opportunity'])]}">
+                <button name="action_analyze_with_manus" type="object" class="oe_stat_button" icon="fa-brain" invisible="type not in ['lead', 'opportunity']">
                     <div class="o_field_widget o_stat_info">
                         <span class="o_stat_value">
                             <field name="manus_score" widget="integer"/>%
@@ -126,7 +126,7 @@
                 </button>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Manus Analysis" attrs="{'invisible': [('manus_analysis_summary', '=', False)]}">
+                <page string="Manus Analysis" invisible="manus_analysis_summary == False">
                     <field name="manus_analysis_summary"/>
                 </page>
             </xpath>
