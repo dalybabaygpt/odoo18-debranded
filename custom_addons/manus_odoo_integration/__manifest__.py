@@ -35,8 +35,7 @@ Integrates with CRM, Project, Documents, HR, Website, and Calendar modules.
         'views/crm_views.xml',
         'views/project_views.xml',
         'views/manus_document_views.xml',
-        'views/hr_views.xml',
-        'views/website_views.xml',
+
         'views/calendar_views.xml',
         'views/res_config_settings_views.xml',
         'data/manus_data.xml',
