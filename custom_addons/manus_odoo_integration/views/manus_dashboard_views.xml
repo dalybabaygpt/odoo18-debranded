@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Manus Dashboard View -->
+    <record id="view_manus_dashboard_kanban" model="ir.ui.view">
+        <field name="name">manus.dashboard.kanban</field>
+        <field name="model">manus.connector</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard" create="false">
+                <field name="name"/>
+                <field name="state"/>
+                <field name="connection_status"/>
+                <field name="request_count"/>
+                <field name="success_count"/>
+                <field name="failure_count"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
+                            <div class="o_kanban_image_fill_left d-none d-md-block"
+                                 t-attf-style="background-image: url(#{kanban_image('manus.connector', 'image', record.id.raw_value, placeholder)})">
+                                <img class="o_kanban_image_inner_pic" t-if="record.state.raw_value == 'production'" src="/manus_odoo_integration/static/src/img/manus_logo.png"/>
+                            </div>
+                            <div class="oe_kanban_details">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <field name="name"/>
+                                        </strong>
+                                        <span class="o_kanban_record_subtitle">
+                                            <t t-if="record.state.raw_value == 'draft'">
+                                                <span class="badge badge-warning">Not Configured</span>
+                                            </t>
+                                            <t t-if="record.state.raw_value == 'test'">
+                                                <span class="badge badge-info">Test Mode</span>
+                                            </t>
+                                            <t t-if="record.state.raw_value == 'production'">
+                                                <span class="badge badge-success">Production</span>
+                                            </t>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <span>Requests</span>
+                                            <h2><field name="request_count"/></h2>
+                                        </div>
+                                        <div class="col-6">
+                                            <span>Success Rate</span>
+                                            <h2>
+                                                <t t-if="record.request_count.raw_value > 0">
+                                                    <t t-esc="Math.round(record.success_count.raw_value / record.request_count.raw_value * 100)"/>%
+                                                </t>
+                                                <t t-else="">
+                                                    0%
+                                                </t>
+                                            </h2>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <strong>Status: </strong>
+                                            <t t-if="record.connection_status.raw_value == 'success'">
+                                                <span class="text-success">Connected</span>
+                                            </t>
+                                            <t t-elif="record.connection_status.raw_value == 'failed'">
+                                                <span class="text-danger">Connection Failed</span>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-warning">Not Tested</span>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_bottom">
+                                    <div class="oe_kanban_bottom_left">
+                                        <button name="test_connection" type="object" class="btn btn-sm btn-primary">
+                                            Test Connection
+                                        </button>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <button name="set_to_production" type="object" class="btn btn-sm btn-success"
+                                                t-if="record.state.raw_value == 'test' and record.connection_status.raw_value == 'success'">
+                                            Set to Production
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Manus Connector Form View -->
+    <record id="view_manus_connector_form" model="ir.ui.view">
+        <field name="name">manus.connector.form</field>
+        <field name="model">manus.connector</field>
+        <field name="arch" type="xml">
+            <form string="Manus Connector">
+                <header>
+                    <button name="test_connection" string="Test Connection" type="object" class="oe_highlight"/>
+                    <button name="set_to_production" string="Set to Production" type="object" 
+                            attrs="{'invisible': ['|', ('state', '!=', 'test'), ('connection_status', '!=', 'success')]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,test,production"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Connector Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="api_key" password="True"/>
+                            <field name="api_endpoint"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="last_connection"/>
+                            <field name="connection_status"/>
+                            <field name="error_message" attrs="{'invisible': [('connection_status', '!=', 'failed')]}"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Feature Configuration">
+                            <group>
+                                <group string="Features">
+                                    <field name="enable_document_processing"/>
+                                    <field name="enable_data_analysis"/>
+                                    <field name="enable_workflow_automation"/>
+                                    <field name="enable_calendar_management"/>
+                                    <field name="enable_customer_interaction"/>
+                                </group>
+                                <group string="Module Integration">
+                                    <field name="enable_crm_integration"/>
+                                    <field name="enable_project_integration"/>
+                                    <field name="enable_document_integration"/>
+                                    <field name="enable_hr_integration"/>
+                                    <field name="enable_website_integration"/>
+                                    <field name="enable_calendar_integration"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Statistics">
+                            <group>
+                                <field name="request_count"/>
+                                <field name="success_count"/>
+                                <field name="failure_count"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- Manus Connector Tree View -->
+    <record id="view_manus_connector_tree" model="ir.ui.view">
+        <field name="name">manus.connector.tree</field>
+        <field name="model">manus.connector</field>
+        <field name="arch" type="xml">
+            <tree string="Manus Connectors" decoration-success="state == 'production'" decoration-info="state == 'test'" decoration-warning="state == 'draft'">
+                <field name="name"/>
+                <field name="api_endpoint"/>
+                <field name="state"/>
+                <field name="connection_status"/>
+                <field name="last_connection"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Manus Connector Action -->
+    <record id="action_manus_connector" model="ir.actions.act_window">
+        <field name="name">Manus Connectors</field>
+        <field name="res_model">manus.connector</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Manus connector
+            </p>
+            <p>
+                Configure your Manus AI connector to enable
+                AI-powered features in Odoo.
+            </p>
+        </field>
+    </record>
+
+    <!-- Dashboard Action -->
+    <record id="action_manus_dashboard" model="ir.actions.act_window">
+        <field name="name">Manus Dashboard</field>
+        <field name="res_model">manus.connector</field>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_manus_dashboard_kanban"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Manus connector
+            </p>
+            <p>
+                Configure your Manus AI connector to enable
+                AI-powered features in Odoo.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_manus_dashboard" name="Dashboard" parent="menu_manus_root" action="action_manus_dashboard" sequence="1"/>
+    <menuitem id="menu_manus_configuration" name="Configuration" parent="menu_manus_root" sequence="100"/>
+    <menuitem id="menu_manus_connector" name="Connectors" parent="menu_manus_configuration" action="action_manus_connector" sequence="10"/>
+</odoo>

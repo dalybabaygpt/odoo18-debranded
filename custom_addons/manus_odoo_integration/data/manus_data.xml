@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="manus_default_data" model="ir.model.data">
+            <field name="name">manus_default_data</field>
+            <field name="module">manus_odoo_integration</field>
+            <field name="model">manus.connector</field>
+            <field name="res_id" eval="1"/>
+            <field name="noupdate" eval="True"/>
+        </record>
+    </data>
+</odoo>
