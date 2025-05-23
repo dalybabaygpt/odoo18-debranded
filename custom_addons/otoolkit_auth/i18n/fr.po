@@ -1,0 +1,109 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* otoolkit_auth
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 17.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-16 10:59+0000\n"
+"PO-Revision-Date: 2025-01-16 10:59+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid ""
+"<i class=\"o_button_icon oi oi-fw oi-arrow-right me-1\" aria-hidden=\"true\"/>\n"
+"                                <span class=\"pl-2\">Open Website</span>"
+msgstr ""
+"<i class=\"o_button_icon oi oi-fw oi-arrow-right me-1\" aria-hidden=\"true\"/>\n"
+"<span class=\"pl-2\">Aller sur le site</span>"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "API Authentication"
+msgstr "Authentification"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "API Key"
+msgstr "Cléf API"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Available balance on the account"
+msgstr "Solde disponible sur votre compte"
+
+#. module: otoolkit_auth
+#: model:ir.model,name:otoolkit_auth.model_res_config_settings
+msgid "Config Settings"
+msgstr "Paramètres de configuration"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Enter an API key of your Otoolkit account here"
+msgstr "Entrez une clé API de votre compte Otoolkit ici"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Otoolkit"
+msgstr ""
+
+#. module: otoolkit_auth
+#: model:ir.model.fields,field_description:otoolkit_auth.field_res_config_settings__otoolkit_api_key
+msgid "Otoolkit API key"
+msgstr "Clés API Otoolkit"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Otoolkit Account"
+msgstr "Compte Otoolkit"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Otoolkit Tokens"
+msgstr "Crédits Otookit"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "Refresh token count"
+msgstr "Rafraîchir le nombre de crédits"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "The API key is invalid. Please update your settings."
+msgstr "La clé API n'est pas valide. Veuillez mettre à jour vos paramètres."
+
+#. module: otoolkit_auth
+#: model:ir.model.fields,help:otoolkit_auth.field_res_config_settings__otoolkit_api_key
+msgid "This API key allow you to communicate with the otoolkit api."
+msgstr "Cette clé API vous permet de communiquer avec l'API otoolkit."
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid ""
+"To generate an API key, you need to create an Otoolkit account. To do this, "
+"follow the link below."
+msgstr ""
+"Pour générer une clé API, vous devez créer un compte Otoolkit. Pour ce "
+"faire, suivez le lien ci-dessous."
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "To use otoolkit services, you need a valid api key."
+msgstr "Pour utiliser les services otoolkit, vous avez besoin d'une clé api valide."
+
+#. module: otoolkit_auth
+#: model:ir.model.fields,field_description:otoolkit_auth.field_res_config_settings__otoolkit_api_token_count
+msgid "Token Count"
+msgstr "Nombre de crédits"
+
+#. module: otoolkit_auth
+#: model_terms:ir.ui.view,arch_db:otoolkit_auth.res_config_settings_view_form
+msgid "tokens"
+msgstr "crédits"

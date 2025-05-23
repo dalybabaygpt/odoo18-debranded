@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-inherit="web.TranslationDialog" t-inherit-mode="extension">
+        <xpath expr="//t[@t-set-slot='footer']" position="replace">
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="onSave">
+                    Save
+                </button>
+                <button class="btn btn-secondary" t-on-click="props.close">
+                    Discard
+                </button>
+                <button type="button" class="btn btn-secondary ml-3" t-on-click="autoTranslate">
+                    Auto Translate
+                </button>
+            </t>
+        </xpath>
+    </t>
+</templates>

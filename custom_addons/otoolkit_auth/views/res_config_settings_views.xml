@@ -1,0 +1,37 @@
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.otoolkit_api</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="40"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Otoolkit" id="otoolkit_auth" string="Otoolkit" name="otoolkit_auth">
+                    <block title="API Authentication" id="api_authentication">
+                        <setting id="otoolkit_api_key_settings" string="API Key" help="Enter an API key of your Otoolkit account here">
+                            <field name="otoolkit_api_key" class="o_light_label mt8"/>
+                        </setting>
+                        <setting id="otoolkit_account_settings" string="Otoolkit Account" help="To generate an API key, you need to create an Otoolkit account. To do this, follow the link below.">
+                            <a href="https://otoolkit.app/dashboard" target="_blank" class="btn-link" role="button">
+                                <i class="o_button_icon oi oi-fw oi-arrow-right me-1" aria-hidden="true"></i>
+                                <span class="pl-2">Open Website</span>
+                            </a>
+                        </setting>
+                        <setting id="otoolkit_tokens_settings" string="Otoolkit Tokens" help="Available balance on the account">
+                            <div invisible="otoolkit_api_token_count != -100000001" class="alert alert-danger" role="alert">
+                                The API key is invalid. Please update your settings.
+                            </div>
+                            <div invisible="otoolkit_api_token_count != -100000000" class="alert alert-warning" role="alert">
+                                To use otoolkit services, you need a valid api key.
+                            </div>
+                            <span invisible="-100000000 >= otoolkit_api_token_count >= -100000001"><field name="otoolkit_api_token_count" /> tokens</span>
+                            <div invisible="-100000000 >= otoolkit_api_token_count >= -100000001">
+                                <button string="Refresh token count" type="object" name="refresh_token_count" class="btn-link ms-2"/>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

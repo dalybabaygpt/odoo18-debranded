@@ -1,0 +1,108 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* otoolkit_auto_translate_fields
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 17.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-16 11:00+0000\n"
+"PO-Revision-Date: 2025-01-16 11:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-python
+#: code:addons/otoolkit_auto_translate_fields/models/translation_dialog.py:0
+#, python-format
+msgid "An error has occurred, please try again later."
+msgstr "Une erreur s'est produite, veuillez réessayer plus tard."
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/xml/translation_dialog_auto_translate.xml:0
+#, python-format
+msgid "Auto Translate"
+msgstr "Traduire"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/xml/translation_dialog_auto_translate.xml:0
+#, python-format
+msgid "Discard"
+msgstr "Annuler"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/js/translation_dialog_auto_translate.js:0
+#, python-format
+msgid "Get tokens"
+msgstr "Obtenir des crédits"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/js/translation_dialog_auto_translate.js:0
+#, python-format
+msgid "Open Settings"
+msgstr "Ouvrir les paramètres"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/xml/translation_dialog_auto_translate.xml:0
+#, python-format
+msgid "Save"
+msgstr "Sauvegarder"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/js/translation_dialog_auto_translate.js:0
+#, python-format
+msgid "Successfully translated"
+msgstr "Traduction réussie"
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-python
+#: code:addons/otoolkit_auto_translate_fields/models/translation_dialog.py:0
+#, python-format
+msgid "The default language text cannot be empty."
+msgstr "Le texte de la langue par défaut ne peut pas être vide."
+
+#. module: otoolkit_auto_translate_fields
+#: model:ir.model,name:otoolkit_auto_translate_fields.model_translation_dialog
+msgid "Translation Dialog"
+msgstr ""
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-javascript
+#: code:addons/otoolkit_auto_translate_fields/static/src/js/translation_dialog_auto_translate.js:0
+#, python-format
+msgid "Translation in progress..."
+msgstr "Traduction en cours..."
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-python
+#: code:addons/otoolkit_auto_translate_fields/models/translation_dialog.py:0
+#, python-format
+msgid ""
+"You do not have enough credits to translate. Please add credits to your "
+"balance to use this function."
+msgstr ""
+"Vous n'avez pas assez de crédits pour traduire. Veuillez ajouter des crédits"
+" à votre solde pour utiliser cette fonction."
+
+#. module: otoolkit_auto_translate_fields
+#. odoo-python
+#: code:addons/otoolkit_auto_translate_fields/models/translation_dialog.py:0
+#: code:addons/otoolkit_auto_translate_fields/models/translation_dialog.py:0
+#, python-format
+msgid ""
+"Your API key is invalid. This may be due to an input error, deletion or "
+"deactivation of the key. Please check your Otoolkit settings."
+msgstr ""
+"Votre clé API n'est pas valide. Cela peut être dû à une erreur de saisie, à "
+"la suppression ou à la désactivation de la clé. Veuillez vérifier les "
+"paramètres de votre Otoolkit."
