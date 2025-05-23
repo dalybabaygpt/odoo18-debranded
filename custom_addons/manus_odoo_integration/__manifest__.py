@@ -30,13 +30,13 @@ Integrates with CRM, Project, Documents, HR, Website, and Calendar modules.
     'data': [
         'security/manus_security.xml',
         'security/ir.model.access.csv',
-        'views/manus_settings_views.xml',
+
         'views/manus_dashboard_views.xml',
         'views/crm_views.xml',
         'views/project_views.xml',
         'views/manus_document_views.xml',
 
-        'views/calendar_views.xml',
+
         'views/res_config_settings_views.xml',
         'data/manus_data.xml',
         'data/cron_jobs.xml',
