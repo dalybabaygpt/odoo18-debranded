@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <form string="Document Processing">
                 <header>
-                    <button name="action_process_document" string="Process Document" type="object" class="oe_highlight" invisible="state not in ['draft']"/>
-                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" invisible="state == 'draft'"/>
+                    <button name="action_process_document" string="Process Document" type="object" class="oe_highlight" invisible="state not in [\'draft\']"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" invisible="state == \'draft\'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,processing,processed"/>
                 </header>
                 <sheet>
@@ -30,13 +30,13 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Extracted Data" invisible="state not in ['processed']">
+                        <page string="Extracted Data" invisible="state not in [\'processed\']">
                             <field name="extracted_data" widget="text_json"/>
                         </page>
-                        <page string="Processing Result" invisible="state not in ['processed']">
+                        <page string="Processing Result" invisible="state not in [\'processed\']">
                             <field name="processing_result"/>
                         </page>
-                        <page string="Error" invisible="state != 'failed'">
+                        <page string="Error" invisible="state != \'failed\'">
                             <field name="error_message"/>
                         </page>
                     </notebook>
@@ -54,7 +54,7 @@
         <field name="name">manus.document.tree</field>
         <field name="model">manus.document</field>
         <field name="arch" type="xml">
-            <list string="Documents" decoration-info="state == 'draft'" decoration-warning="state == 'processing'" decoration-success="state == 'processed'" decoration-danger="state == 'failed'">
+            <list string="Documents" decoration-info="state == \'draft\'" decoration-warning="state == \'processing\'" decoration-success="state == \'processed\'" decoration-danger="state == \'failed\'">
                 <field name="name"/>
                 <field name="document_type"/>
                 <field name="partner_id"/>
@@ -75,15 +75,15 @@
                 <field name="document_type"/>
                 <field name="partner_id"/>
                 <field name="user_id"/>
-                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
-                <filter string="Processing" name="processing" domain="[('state', '=', 'processing')]"/>
-                <filter string="Processed" name="processed" domain="[('state', '=', 'processed')]"/>
-                <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
+                <filter string="Draft" name="draft" domain="[(\'state\', \'=\', \'draft\')]"/>
+                <filter string="Processing" name="processing" domain="[(\'state\', \'=\', \'processing\')]"/>
+                <filter string="Processed" name="processed" domain="[(\'state\', \'=\', \'processed\')]"/>
+                <filter string="Failed" name="failed" domain="[(\'state\', \'=\', \'failed\')]"/>
                 <group expand="0" string="Group By">
-                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
-                    <filter string="Document Type" name="group_by_type" context="{'group_by': 'document_type'}"/>
-                    <filter string="Partner" name="group_by_partner" context="{'group_by': 'partner_id'}"/>
-                    <filter string="Responsible" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Status" name="group_by_state" context="{\'group_by\': \'state\'}"/>
+                    <filter string="Document Type" name="group_by_type" context="{\'group_by\': \'document_type\'}"/>
+                    <filter string="Partner" name="group_by_partner" context="{\'group_by\': \'partner_id\'}"/>
+                    <filter string="Responsible" name="group_by_user" context="{\'group_by\': \'user_id\'}"/>
                 </group>
             </search>
         </field>
@@ -108,6 +108,6 @@
     </record>
 
     <!-- Menu Items -->
-    <menuitem id="menu_manus_root" name="Manus AI" sequence="90" web_icon="manus_odoo_integration,static/description/icon.png"/>
+    <!-- Root menu moved to views/menu_views.xml -->
     <menuitem id="menu_manus_document" name="Document Processing" parent="menu_manus_root" action="action_manus_document" sequence="10"/>
 </odoo>
