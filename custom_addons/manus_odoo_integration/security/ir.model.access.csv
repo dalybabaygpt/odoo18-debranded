@@ -1,3 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_manus_connector_manager,manus.connector.manager,model_manus_connector,manus_odoo_integration.group_manus_manager,1,1,1,1
-access_manus_connector_user,manus.connector.user,model_manus_connector,manus_odoo_integration.group_manus_user,1,0,0,0

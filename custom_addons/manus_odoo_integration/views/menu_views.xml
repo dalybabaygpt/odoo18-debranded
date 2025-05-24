@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- Root Menu Item -->
-    <menuitem id="menu_manus_root" name="Manus AI" sequence="90" web_icon="manus_odoo_integration,static/description/icon.png"/>
-</odoo>
