@@ -56,14 +56,14 @@
         <field name="name">manus.crm.tree</field>
         <field name="model">manus.crm</field>
         <field name="arch" type="xml">
-            <tree string="CRM Analysis" decoration-info="state == 'draft'" decoration-warning="state == 'processing'" decoration-success="state == 'completed'" decoration-danger="state == 'failed'">
+            <list string="CRM Analysis" decoration-info="state == 'draft'" decoration-warning="state == 'processing'" decoration-success="state == 'completed'" decoration-danger="state == 'failed'">
                 <field name="name"/>
                 <field name="lead_id"/>
                 <field name="analysis_type"/>
                 <field name="result_score" widget="progressbar"/>
                 <field name="user_id"/>
                 <field name="state"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -95,7 +95,7 @@
     <record id="action_manus_crm" model="ir.actions.act_window">
         <field name="name">CRM Analysis</field>
         <field name="res_model">manus.crm</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_manus_crm_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

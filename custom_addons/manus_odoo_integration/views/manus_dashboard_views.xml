@@ -161,14 +161,14 @@
         <field name="name">manus.connector.tree</field>
         <field name="model">manus.connector</field>
         <field name="arch" type="xml">
-            <tree string="Manus Connectors" decoration-success="state == 'production'" decoration-info="state == 'test'" decoration-warning="state == 'draft'">
+            <list string="Manus Connectors" decoration-success="state == 'production'" decoration-info="state == 'test'" decoration-warning="state == 'draft'">
                 <field name="name"/>
                 <field name="api_endpoint"/>
                 <field name="state"/>
                 <field name="connection_status"/>
                 <field name="last_connection"/>
                 <field name="active"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -176,7 +176,7 @@
     <record id="action_manus_connector" model="ir.actions.act_window">
         <field name="name">Manus Connectors</field>
         <field name="res_model">manus.connector</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a new Manus connector
