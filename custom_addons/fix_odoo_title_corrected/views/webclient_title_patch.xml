@@ -1,0 +1,7 @@
+<odoo>
+    <template id="webclient_title_patch" inherit_id="web.webclient_bootstrap">
+        <xpath expr="//title" position="replace">
+            <title>Erp</title>
+        </xpath>
+    </template>
+</odoo>
