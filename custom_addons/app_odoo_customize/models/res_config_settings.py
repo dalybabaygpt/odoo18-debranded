@@ -318,6 +318,8 @@ class ResConfigSettings(models.TransientModel):
             # 'account.invoice',
             'account.payment',
             'account.bank.statement',
+            'account.fiscal.position.account',
+            'account.tax.repartition.line',
             # 'account.tax.account.tag',
             'account.tax',
             'account.tax.template',

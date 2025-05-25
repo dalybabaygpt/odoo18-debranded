@@ -28,7 +28,6 @@
             <rng:optional><rng:attribute name="delete"/></rng:optional>
             <rng:optional><rng:attribute name="edit"/></rng:optional>
             <rng:optional><rng:attribute name="multi_edit"/></rng:optional>
-            <rng:optional><rng:attribute name="multi_group_select"/></rng:optional>
             <rng:optional><rng:attribute name="export_xlsx"/></rng:optional>
             <rng:optional><rng:attribute name="duplicate"/></rng:optional>
             <rng:optional><rng:attribute name="import"/></rng:optional>
@@ -56,6 +55,7 @@
             <rng:optional><rng:attribute name="bg-warning"/></rng:optional>
             <rng:optional><rng:attribute name="bg-black"/></rng:optional>
             <rng:optional><rng:attribute name="bg-white"/></rng:optional>
+            <rng:optional><rng:attribute name="multi_group_select"/></rng:optional>
             <rng:optional><rng:attribute name="sample"/></rng:optional>
             <rng:optional><rng:attribute name="action"/></rng:optional>
             <rng:optional><rng:attribute name="type"/></rng:optional>

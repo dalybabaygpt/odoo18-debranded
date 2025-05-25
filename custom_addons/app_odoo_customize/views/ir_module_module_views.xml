@@ -54,12 +54,6 @@
 			        <field name="addons_path_id" invisible="1"/>
 			        <field name="addons_path" groups="base.group_no_one"/>
 		        </field>
-                <xpath expr="//button[@name='button_immediate_install']" position="attributes">
-                    <attribute name="invisible">to_buy or state != 'uninstalled' or (module_type and module_type not in ('official', 'odooapp.cn'))</attribute>
-                </xpath>
-                <xpath expr="//button[@name='button_immediate_upgrade']" position="attributes">
-                    <attribute name="invisible">state != 'installed' or (module_type and module_type not in ('official', 'odooapp.cn'))</attribute>
-                </xpath>
             </field>
         </record>
 
@@ -73,6 +67,12 @@
                 </xpath>
                 <xpath expr="//button[@name='button_immediate_install_app'][2]" position="attributes">
                     <attribute name="invisible">state == 'uninstalled' or module_type in ('official', 'odooapp.cn', False)</attribute>
+                </xpath>
+                <xpath expr="//button[@name='button_immediate_install']" position="attributes">
+                    <attribute name="invisible">to_buy or state != 'uninstalled' or (module_type and module_type not in ('official', 'odooapp.cn'))</attribute>
+                </xpath>
+                <xpath expr="//button[@name='button_immediate_upgrade']" position="attributes">
+                    <attribute name="invisible">state != 'installed' or (module_type and module_type not in ('official', 'odooapp.cn'))</attribute>
                 </xpath>
             </field>
         </record>

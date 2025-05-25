@@ -22,8 +22,8 @@
 # description:
 
 {
-    'name': '!18odoo Tweak OEM Development Enhance.Boost,Customize,Ai Employee,UI,Security,Remove Data All in One-优化提速50+项大全',
-    'version': '18.0.25.04.03',
+    'name': '18odoo Tweak OEM Development Enhance.Boost,Customize,Ai Employee,UI,Security,Remove Data All in One-优化提速51+项大全',
+    'version': '18.0.25.04.30',
     'author': 'odooai.cn',
     'category': 'Extra Tools',
     'website': 'https://www.odooai.cn',
@@ -76,12 +76,14 @@
             'app_odoo_customize/static/src/js/user_menu.js',
             'app_odoo_customize/static/src/js/ribbon.js',
             'app_odoo_customize/static/src/js/dialog.js',
+            # 'app_odoo_customize/static/src/js/navbar.js',
             'app_odoo_customize/static/src/js/base_import_list_renderer.js',
             'app_odoo_customize/static/src/js/base_import_list_renderer.js',
             'app_odoo_customize/static/src/webclient/*.js',
             'app_odoo_customize/static/src/webclient/user_menu.xml',
             'app_odoo_customize/static/src/xml/res_config_edition.xml',
             'app_odoo_customize/static/src/xml/base_import.xml',
+            # 'app_odoo_customize/static/src/xml/debug_templates.xml',
         ],
     },
     'pre_init_hook': 'pre_init_hook',
@@ -146,6 +148,7 @@
     48. Add configurable Test Label, Demo Ribbon on top menu.
     49. Add SaaS client switch for online Translate sync(18 only).
     50. Quick Menu manager. de-active / active menu.
+    51. Show menu xml_id in debug asset mode.  easy for menu and action development.
 
     This module can help to white label the Odoo.
     Also helpful for training and support for your odoo end-user.
@@ -204,5 +207,6 @@
     48. 增加可配置的系统调试标签，用于系统测试期提示.
     49. 增加 SaaS 客户端开头，可让用户安装在线翻译同步模块及在线更新(仅odoo18).
     50. 快速菜单管理，快速禁用/启用菜单.
+    51. 在开发者Assets模式中，快速查看菜单Menu 的 xml_id .
     """,
 }
