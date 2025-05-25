@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="IdleScreen" t-inherit="point_of_sale.IdleScreen" t-inherit-mode="extension">
+        <xpath expr="//img[contains(@class, 'pos-splash-logo')]" position="replace">
+            <div class="pos-splash-logo" style="background: url('/pos_idle_screen_clean/static/src/img/idle_background.png') center center no-repeat; background-size: cover; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <h1 style="color: white; font-size: 48px; text-shadow: 2px 2px 6px #000;">Welcome to Your POS</h1>
+            </div>
+        </xpath>
+    </t>
+</templates>
