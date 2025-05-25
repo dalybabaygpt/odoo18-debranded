@@ -1,0 +1,12 @@
+<odoo noupdate="1">
+    <data>
+        <record id="param_base_url" model="ir.config_parameter">
+            <field name="key">web.base.url</field>
+            <field name="value">https://erp.local</field>
+        </record>
+        <record id="param_base_sorturl" model="ir.config_parameter">
+            <field name="key">web.base.sorturl</field>
+            <field name="value">erp</field>
+        </record>
+    </data>
+</odoo>

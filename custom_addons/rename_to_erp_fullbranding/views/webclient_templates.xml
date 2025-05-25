@@ -1,0 +1,15 @@
+<odoo>
+    <template id="webclient_bootstrap" inherit_id="web.webclient_bootstrap">
+        <xpath expr="//t[@t-name='web.webclient_title']" position="replace">
+            <title>Erp</title>
+        </xpath>
+    </template>
+
+    <template id="web_login_layout" inherit_id="web.login_layout">
+        <xpath expr="//div[@class='footer']" position="replace">
+            <div class="footer">
+                <p>Powered by Erpai</p>
+            </div>
+        </xpath>
+    </template>
+</odoo>
