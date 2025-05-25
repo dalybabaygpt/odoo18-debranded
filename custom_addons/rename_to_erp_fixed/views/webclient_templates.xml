@@ -1,0 +1,7 @@
+<odoo>
+    <template id="webclient_bootstrap_inherit" inherit_id="web.webclient_bootstrap" name="WebClient Branding Overwrite">
+        <xpath expr="//title" position="replace">
+            <title>Erp</title>
+        </xpath>
+    </template>
+</odoo>
