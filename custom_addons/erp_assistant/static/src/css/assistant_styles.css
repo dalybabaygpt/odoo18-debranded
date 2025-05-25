@@ -1,0 +1,106 @@
+/* ERP Assistant Styles */
+
+.erp-assistant-float-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background-color: #714B67; /* Odoo purple or a custom color */
+    color: white;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1050; /* Ensure it's above most elements */
+    transition: transform 0.2s ease-in-out;
+}
+
+.erp-assistant-float-button:hover {
+    transform: scale(1.1);
+}
+
+.erp-assistant-panel {
+    position: fixed;
+    bottom: 80px; /* Position above the button */
+    right: 20px;
+    width: 350px;
+    max-height: 400px;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1049;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none; /* Hidden by default */
+}
+
+.erp-assistant-panel.o_open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto; /* Visible */
+}
+
+.erp-assistant-header {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.erp-assistant-header h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.erp-assistant-close-button {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.erp-assistant-body {
+    padding: 15px;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.erp-assistant-body p {
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.erp-assistant-body strong {
+    font-weight: 600;
+}
+
+.erp-assistant-footer {
+    padding: 10px 15px;
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.erp-assistant-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Add more specific styles as needed */
+
