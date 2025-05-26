@@ -44,6 +44,41 @@ bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/ma
 bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/main/scripts/create_SSL.sh)
 ```
 
+
+
+🔄 Daily Auto-Sync for Custom Addons
+To ensure all your Odoo databases always have the latest custom modules, you can run Script2 to automatically pull updates from this repository every day at 4:00 AM and restart Odoo.
+
+✅ How to Enable
+After installing Odoo using Script1, simply run:
+
+bash
+Copy
+Edit
+
+bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/main/scripts/Script2.sh)
+
+This will:
+
+Clone (or pull) the latest custom_addons from this repo
+
+Create a sync script at /opt/odoo/git_sync.sh
+
+Schedule it to run daily at 4:00 AM using cron
+
+Restart the Odoo service automatically
+
+📌 Notes
+Works with both new and existing Odoo installations
+
+Safe to run multiple times (won’t duplicate cron jobs)
+
+Logs are saved to /var/log/odoo_git_sync.log
+
+
+
+
+
 ---
 
 ### 3️⃣ `install_full.sh` — One-Click Install for Domain-Based Setup
