@@ -171,7 +171,11 @@ Created and maintained by [@dalybabaygpt](https://github.com/dalybabaygpt) for h
 
 MIT License – Free for commercial and personal use.
 
-NOTES: Remove reloading Odooai: go to views then web.webclient_bootstrap the add this to the second line: 
+
+
+
+NOTES: Remove reloading Odooai:
+go to views then web.webclient_bootstrap the add this to the second line: 
     <t t-set="title">ERP</t>
 
 So it looks like this:
