@@ -1,0 +1,23 @@
+<odoo>
+    <data noupdate="0">
+        <!-- Update branding in footer -->
+        <record id="base.footer" model="ir.ui.view">
+            <field name="arch" type="xml">
+                <xpath expr="//div[contains(@class, 'o_footer_copyright')]" position="replace">
+                    <div class="o_footer_copyright">Powered by Erpai</div>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Rename Main Settings Menu if it says Odoo Settings -->
+        <record id="base.menu_config" model="ir.ui.menu">
+            <field name="name">Erpai Settings</field>
+        </record>
+
+        <!-- System Parameter: web.base.sorturl -->
+        <function model="ir.config_parameter" name="set_param">
+            <value eval="'web.base.sorturl'"/>
+            <value eval="'erp'"/>
+        </function>
+    </data>
+</odoo>
