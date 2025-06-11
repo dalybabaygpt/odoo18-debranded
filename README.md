@@ -127,7 +127,10 @@ bash <(curl -s https://raw.githubusercontent.com/dalybabaygpt/ERP18-debranded/ma
 ---
 
 ## 🧠 Tips & Troubleshooting
-
+Remove reloading Odooai:
+go to views then web.webclient_bootstrap the add this to the second line: 
+    <t t-set="title">ERP</t>
+    
 - Check `https://yourdomain.com/websocket` or `/longpolling` in browser dev tools to confirm real-time is working.
 - Run `ss -tuln | grep 8072` to verify gevent is active.
 - If NGINX fails, run:
