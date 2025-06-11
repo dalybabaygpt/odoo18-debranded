@@ -182,3 +182,6 @@ So it looks like this:
  <t t-name="web.webclient_bootstrap">
     <t t-set="title">ERP</t>
 
+Or 
+        <title><t t-raw="title"/></title>
+
